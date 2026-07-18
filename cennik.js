@@ -4,6 +4,7 @@ const {
   StringSelectMenuBuilder,
   Events
 } = require("discord.js");
+const { upsertPanel } = require("./panelManager");
 
 module.exports = (client) => {
 
@@ -86,12 +87,12 @@ ${EMOJI_MONEY} Najlepsze ceny
 
       const row = new ActionRowBuilder().addComponents(menu);
 
-      await channel.send({
+      await upsertPanel(channel, {
         embeds: [embed],
         components: [row]
-      });
+      }, { customId: "starx_cennik" });
 
-      console.log("✅ Cennik wysłany");
+      console.log("✅ Cennik zaktualizowany");
 
     } catch (err) {
       console.log("❌ Cennik error:", err);

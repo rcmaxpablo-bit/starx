@@ -1,9 +1,10 @@
-﻿const {
+const {
   EmbedBuilder,
   ActionRowBuilder,
   StringSelectMenuBuilder,
   Events
 } = require("discord.js");
+const { upsertPanel } = require("./panelManager");
 
 module.exports = async (client) => {
   const CHANNEL_ID = "1499513009188376767";
@@ -101,12 +102,12 @@ module.exports = async (client) => {
       .setPlaceholder("Wybierz metode")
       .addOptions(menuOptions());
 
-    await channel.send({
+    await upsertPanel(channel, {
       embeds: [embed],
       components: [new ActionRowBuilder().addComponents(menu)]
-    });
+    }, { customId: "show_rates" });
 
-    console.log("Panel prowizji wyslany");
+    console.log("Panel prowizji zaktualizowany");
   }
 
   if (client.isReady()) {

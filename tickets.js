@@ -1,4 +1,4 @@
-﻿const {
+const {
   EmbedBuilder,
   StringSelectMenuBuilder,
   ActionRowBuilder,
@@ -13,6 +13,7 @@
   LabelBuilder,
   StringSelectMenuOptionBuilder
 } = require("discord.js");
+const { upsertPanel } = require("./panelManager");
 
 module.exports = (client) => {
 
@@ -576,12 +577,12 @@ module.exports = (client) => {
           text: "© 2026 StarX Exchange"
         });
 
-    await channel.send({
+    await upsertPanel(channel, {
       embeds: [embed],
       components: [createMenu()]
-    });
+    }, { customId: "ticket_select" });
 
-    console.log("✅ Panel ticketów wysłany.");
+    console.log("✅ Panel ticketów zaktualizowany.");
   });
 
   // =========================================
@@ -905,15 +906,19 @@ module.exports = (client) => {
         });
       }
 
-      const afterFee = (Number(amount) * (1 - percent / 100)).toFixed(2);
+      const numericAmount = Number(amount);
+      const percentageFee = (numericAmount * percent) / 100;
+      const fee = Math.max(percentageFee, 3);
+      const afterFee = (numericAmount - fee).toFixed(2);
 
       const exchangePayload = {
         userId: interaction.user.id,
-        amount: Number(amount),
+        amount: numericAmount,
         from,
         to,
         currency,
         percent,
+        fee: Number(fee.toFixed(2)),
         afterFee: Number(afterFee),
         createdAt: Date.now()
       };
@@ -968,7 +973,7 @@ module.exports = (client) => {
           `> ${currency}`,
           ``,
           `${EMOJI.zap} **PROWIZJA:**`,
-          `> ${percent}%`,
+          `> ${percent}% — ${formatCurrency(fee, currency)} (minimum 3 PLN)`,
           ``,
           `${EMOJI.pin} **PO PROWIZJI:**`,
           `> ${formatCurrency(afterFee, currency)}`

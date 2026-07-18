@@ -1,3 +1,8 @@
+## Minimalna prowizja 3 PLN
+- poprawiono automatyczne obliczanie prowizji w ticketach wymiany,
+- prowizja procentowa nigdy nie jest niższa niż 3 PLN,
+- w tickecie wyświetlana jest również faktyczna kwota pobranej prowizji.
+
 # StarX Exchange style - zmiany
 
 Zrobione pod wygląd ze screenów, ale z brandingiem **🌟 StarX Exchange**.
@@ -40,3 +45,11 @@ Zrobione pod wygląd ze screenów, ale z brandingiem **🌟 StarX Exchange**.
 - Po kliknięciu/przyjęciu ticketa kanał przenosi się do kategorii `1510410009853431868`.
 - Nazwa kanału zmienia prefiks z `unlock-` na `lock-` po przejęciu.
 - Przy oddaniu ticketa `/odprzyjmij` kanał wraca do kategorii nieprzejętych i prefiksu `unlock-`.
+
+## 18.07.2026 — edytowanie paneli zamiast duplikowania
+- Dodano `panelManager.js`.
+- Stałe panele po restarcie są edytowane zamiast wysyłane ponownie.
+- Starsze duplikaty tego samego panelu są automatycznie usuwane.
+- Zmiana obejmuje: tickety, cennik, prowizje, kalkulator prowizji, regulamin, weryfikację, opinie, legit check i panel `+rep`.
+- Liczniki głosów w panelu legit check są zachowywane podczas restartu.
+- Minimalna prowizja 3 PLN pozostaje bez zmian.

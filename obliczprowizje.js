@@ -1,4 +1,4 @@
-﻿const {
+const {
     EmbedBuilder,
     ActionRowBuilder,
     StringSelectMenuBuilder,
@@ -9,6 +9,7 @@
     StringSelectMenuOptionBuilder,
     Events
 } = require("discord.js");
+const { upsertPanel } = require("./panelManager");
 
 module.exports = (client) => {
     const CHANNEL_ID = "1499568863602540645";
@@ -197,12 +198,12 @@ module.exports = (client) => {
                 }
             ]);
 
-        await channel.send({
+        await upsertPanel(channel, {
             embeds: [embed],
             components: [new ActionRowBuilder().addComponents(menu)]
-        });
+        }, { customId: "calc_type" });
 
-        console.log("Kalkulator prowizji wyslany");
+        console.log("Kalkulator prowizji zaktualizowany");
     }
 
     if (client.isReady()) {

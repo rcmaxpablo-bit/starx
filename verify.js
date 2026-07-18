@@ -7,6 +7,7 @@ const {
     TextInputBuilder,
     TextInputStyle
 } = require("discord.js");
+const { upsertPanel } = require("./panelManager");
 
 module.exports = (client) => {
 
@@ -116,10 +117,10 @@ module.exports = (client) => {
             })
             .setTimestamp();
 
-        await channel.send({
+        await upsertPanel(channel, {
             embeds: [embed],
             components: [createMenu()]
-        });
+        }, { customId: "verify_select" });
     }
 
     // =========================================

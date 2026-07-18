@@ -1,4 +1,5 @@
 const { EmbedBuilder, Events } = require("discord.js");
+const { upsertPanel } = require("./panelManager");
 
 module.exports = (client) => {
 
@@ -41,12 +42,9 @@ module.exports = (client) => {
       )
       .setFooter({ text: "StarX Exchange" });
 
-    // usuń stary panel
-    if (panelMessage) {
-      await panelMessage.delete().catch(() => {});
-    }
-
-    panelMessage = await channel.send({ embeds: [embed] });
+    panelMessage = await upsertPanel(channel, { embeds: [embed] }, {
+      embedTitle: "🌟 StarX Exchange × LEGIT CHECK"
+    });
   }
 
   // =========================

@@ -1,5 +1,6 @@
 // regulamin.js
 const { EmbedBuilder, Events } = require("discord.js");
+const { upsertPanel } = require("./panelManager");
 
 module.exports = (client) => {
 
@@ -94,9 +95,11 @@ module.exports = (client) => {
         })
         .setTimestamp();
 
-      await channel.send({ embeds: [embed] });
+      await upsertPanel(channel, { embeds: [embed] }, {
+        embedTitle: "<:regulamin:1501693215328440370> StarX Exchange • Regulamin"
+      });
 
-      console.log("✅ Regulamin wysłany");
+      console.log("✅ Regulamin zaktualizowany");
 
     } catch (err) {
       console.log("❌ Błąd regulamin.js:", err);

@@ -5,6 +5,7 @@ const {
   ButtonStyle,
   Events
 } = require("discord.js");
+const { findPanelMessage, upsertPanel } = require("./panelManager");
 
 module.exports = (client) => {
 
@@ -23,6 +24,19 @@ module.exports = (client) => {
     try {
       const channel = await client.channels.fetch(CHANNEL_ID);
       if (!channel) return;
+
+      // Zachowaj aktualne liczniki głosów ze starego panelu po restarcie bota.
+      const oldPanel = await findPanelMessage(channel, { customId: "legit_yes" });
+      if (oldPanel) {
+        const buttons = oldPanel.components.flatMap(row => row.components || []);
+        const oldYes = buttons.find(button => button.customId === "legit_yes");
+        const oldNo = buttons.find(button => button.customId === "legit_no");
+
+        const parsedYes = Number(oldYes?.label);
+        const parsedNo = Number(oldNo?.label);
+        if (Number.isFinite(parsedYes)) yesVotes = parsedYes;
+        if (Number.isFinite(parsedNo)) noVotes = parsedNo;
+      }
 
       const embed = new EmbedBuilder()
         .setColor('#1b2dff')
@@ -53,10 +67,10 @@ module.exports = (client) => {
           .setStyle(ButtonStyle.Secondary)
       );
 
-      const msg = await channel.send({
+      const msg = await upsertPanel(channel, {
         embeds: [embed],
         components: [row]
-      });
+      }, { customId: "legit_yes" });
 
       legitMessageId = msg.id;
 

@@ -8,6 +8,7 @@ const {
   TextInputStyle,
   Events
 } = require('discord.js');
+const { upsertPanel } = require('./panelManager');
 
 const EMOJI = {
   // =========================
@@ -114,12 +115,12 @@ ${EMOJI.pin} Opinię napiszesz klikając przycisk poniżej.`
           .setStyle(ButtonStyle.Primary)
       );
 
-      panelMessage = await channel.send({
+      panelMessage = await upsertPanel(channel, {
         embeds: [embed],
         components: [row]
-      });
+      }, { customId: "wystaw_opinie" });
 
-      console.log("✅ Panel opinii wysłany.");
+      console.log("✅ Panel opinii zaktualizowany.");
 
     } catch (err) {
       console.log("❌ Błąd panelu:", err);
@@ -241,12 +242,7 @@ ${stars(laczna)}`
           embeds: [embed]
         });
 
-        // usuń stary panel
-        if (panelMessage) {
-          await panelMessage.delete().catch(() => {});
-        }
-
-        // nowy panel
+        // Odśwież istniejący panel zamiast wysyłać kolejny.
         await sendPanel();
 
         await interaction.reply({
