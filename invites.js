@@ -4,6 +4,7 @@ const {
   EmbedBuilder,
   Events
 } = require("discord.js");
+const store = require("./dataStore");
 
 module.exports = (client) => {
 
@@ -120,13 +121,7 @@ module.exports = (client) => {
 
       if (!ownerId) return;
 
-      const key =
-        `invites_${guild.id}_${ownerId}`;
-
-      client[key] =
-        (client[key] || 0) + 1;
-
-      const total = client[key];
+      const total = store.addInviteCount(guild.id, ownerId, 1);
 
       const inviterMember =
         await guild.members
@@ -232,10 +227,7 @@ https://discord.gg/${invite.code}`
       // ======================
       if (interaction.commandName === "invites") {
 
-        const amount =
-          client[
-            `invites_${interaction.guild.id}_${interaction.user.id}`
-          ] || 0;
+        const amount = store.getInviteCount(interaction.guild.id, interaction.user.id);
 
         return interaction.reply({
           embeds: [
@@ -262,10 +254,7 @@ Zaprosiłeś **${amount}** osób.
         const user =
           interaction.options.getUser("osoba");
 
-        const amount =
-          client[
-            `invites_${interaction.guild.id}_${user.id}`
-          ] || 0;
+        const amount = store.getInviteCount(interaction.guild.id, user.id);
 
         return interaction.reply({
           embeds: [
@@ -292,10 +281,7 @@ Posiada **${amount}** zaproszeń.`
             .filter(m => !m.user.bot)
             .map(m => ({
               user: m.user,
-              invites:
-                client[
-                  `invites_${interaction.guild.id}_${m.id}`
-                ] || 0
+              invites: store.getInviteCount(interaction.guild.id, m.id)
             }));
 
         const sorted = members
@@ -348,13 +334,7 @@ Posiada **${amount}** zaproszeń.`
         const amount =
           interaction.options.getInteger("ilosc");
 
-        const key =
-          `invites_${interaction.guild.id}_${user.id}`;
-
-        client[key] =
-          (client[key] || 0) + amount;
-
-        const total = client[key];
+        const total = store.addInviteCount(interaction.guild.id, user.id, amount);
 
         const member =
           await interaction.guild.members

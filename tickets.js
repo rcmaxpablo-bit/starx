@@ -14,6 +14,7 @@ const {
   StringSelectMenuOptionBuilder
 } = require("discord.js");
 const { upsertPanel } = require("./panelManager");
+const store = require("./dataStore");
 
 module.exports = (client) => {
 
@@ -79,6 +80,19 @@ module.exports = (client) => {
     return `${Number(value || 0).toFixed(2)} ${String(currency || "PLN").toUpperCase()}`;
   }
 
+  function saveCustomerTransaction(interaction, { clientId, amount, type, description, currency = "PLN" }) {
+    if (!clientId) return null;
+    return store.recordTransaction({
+      userId: clientId,
+      amount,
+      type,
+      description,
+      currency,
+      channelId: interaction.channel.id,
+      moderatorId: interaction.user.id
+    });
+  }
+
   function cleanTicketName(name) {
     return String(name || "ticket")
       .toLowerCase()
@@ -104,6 +118,31 @@ module.exports = (client) => {
     const member = await guild.members.fetch(userId).catch(() => null);
     if (!member) return;
     await member.roles.add(CLIENT_ROLE_ID).catch(() => {});
+  }
+
+  async function updateLegitCounterChannel(guild, count) {
+    if (!guild) return;
+    const settings = store.read("settings");
+    const prefix = settings.legitCounterChannelPrefix || "✅・legitcheck➜";
+    let channel = null;
+
+    if (settings.legitCounterChannelId) {
+      channel = await guild.channels.fetch(settings.legitCounterChannelId).catch(() => null);
+    }
+
+    if (!channel) {
+      channel = guild.channels.cache.find(ch => ch.name?.startsWith(prefix)) || null;
+      if (channel) {
+        settings.legitCounterChannelId = channel.id;
+        store.write("settings", settings);
+      }
+    }
+
+    if (channel?.setName) {
+      await channel.setName(`${prefix}${count}`).catch(err =>
+        console.log("LEGIT COUNTER RENAME ERROR:", err.message)
+      );
+    }
   }
 
   function ticketButtons(isClaimed = false) {
@@ -598,6 +637,12 @@ module.exports = (client) => {
 
       const ticketId = pendingLegitTickets.get(message.author.id);
       if (!ticketId) return;
+
+      const confirmedTransaction = store.confirmLatestPendingTransaction(message.author.id);
+      if (confirmedTransaction) {
+        const count = store.incrementLegitCount();
+        await updateLegitCounterChannel(message.guild, count);
+      }
 
       const ticket = await message.guild.channels.fetch(ticketId).catch(() => null);
       if (!ticket) {
@@ -1096,6 +1141,13 @@ module.exports = (client) => {
       const amountText = Number.isFinite(amountNumber) ? `${amountNumber.toFixed(0)}PLN` : `${amountRaw}PLN`;
       const legitText = `+rep ${interaction.user} Purchased ${item} ${amountText} [${method}]`;
 
+      saveCustomerTransaction(interaction, {
+        clientId,
+        amount: amountNumber,
+        type: "purchase",
+        description: `Zakup: ${item}`
+      });
+
       if (clientId) {
         await giveClientRoleById(interaction.guild, clientId);
         pendingLegitTickets.set(clientId, interaction.channel.id);
@@ -1161,6 +1213,13 @@ module.exports = (client) => {
       const amountNumber = Number(amountRaw);
       const amountText = Number.isFinite(amountNumber) ? `${amountNumber.toFixed(0)}PLN` : `${amountRaw}PLN`;
       const legitText = `+rep <@${claimedUserId}> Middleman ${amountText}`;
+
+      saveCustomerTransaction(interaction, {
+        clientId,
+        amount: amountNumber,
+        type: "middleman",
+        description: "Usługa Middleman"
+      });
 
       if (clientId) {
         await giveClientRoleById(interaction.guild, clientId);
@@ -1235,6 +1294,14 @@ module.exports = (client) => {
       const exchangeInfo = getExchangeInfoFromTicket(interaction.channel);
       const fromTo = `${displayExchangeMethod(exchangeInfo.from)} TO ${displayExchangeMethod(exchangeInfo.to)}`;
       const legitText = `+rep ${interaction.user} Exchanged ${fromTo} ${formatCurrency(amount, exchangeInfo.currency)}`;
+
+      saveCustomerTransaction(interaction, {
+        clientId,
+        amount: Number(amount),
+        type: "exchange",
+        description: `Wymiana ${fromTo}`,
+        currency: exchangeInfo.currency
+      });
 
       if (clientId) {
         await giveClientRoleById(interaction.guild, clientId);

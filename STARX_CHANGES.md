@@ -58,3 +58,11 @@ Zrobione pod wygląd ze screenów, ale z brandingiem **🌟 StarX Exchange**.
 - Po wysłaniu opinii stary panel „Wystaw opinię” jest usuwany.
 - Opinia jest publikowana jako nowa wiadomość.
 - Następnie bot wysyła świeży panel pod opinią, dzięki czemu przycisk pozostaje na dole kanału.
+
+## Aktualizacja: statystyki klientów i licznik legitcheck
+- Trwałe dane w `data/customers.json`, `data/transactions.json`, `data/invites.json`, `data/settings.json`.
+- Green Marker (`send_legit_check`) zapisuje klienta, kwotę, transakcję i historię.
+- Wiadomość `+rep` klienta potwierdza oczekującą transakcję i zwiększa licznik kanału `✅・legitcheck➜N`.
+- Panel klienta na kanale `1529242794621665371`: statystyki, ostatnie 5 zakupów, zaproszenia, Top 5.
+- Zaproszenia są zapisywane po restarcie.
+- Brak systemu TX-ID i brak blokowania opinii.
