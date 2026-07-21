@@ -123,23 +123,22 @@ module.exports = (client) => {
   async function updateLegitCounterChannel(guild, count) {
     if (!guild) return;
     const settings = store.read("settings");
-    const prefix = settings.legitCounterChannelPrefix || "✅・legitcheck➜";
-    let channel = null;
+    const prefix = "│✅・legit-check→";
+    const channelId = "1500893110048133253";
+    const channel = await guild.channels.fetch(channelId).catch(() => null);
 
-    if (settings.legitCounterChannelId) {
-      channel = await guild.channels.fetch(settings.legitCounterChannelId).catch(() => null);
+    settings.legitCounterChannelId = channelId;
+    settings.legitCounterChannelPrefix = prefix;
+    store.write("settings", settings);
+
+    if (!channel?.setName) {
+      console.log("LEGIT COUNTER: nie znaleziono kanału 1500893110048133253.");
+      return;
     }
 
-    if (!channel) {
-      channel = guild.channels.cache.find(ch => ch.name?.startsWith(prefix)) || null;
-      if (channel) {
-        settings.legitCounterChannelId = channel.id;
-        store.write("settings", settings);
-      }
-    }
-
-    if (channel?.setName) {
-      await channel.setName(`${prefix}${count}`).catch(err =>
+    const newName = `${prefix}${count}`;
+    if (channel.name !== newName) {
+      await channel.setName(newName).catch(err =>
         console.log("LEGIT COUNTER RENAME ERROR:", err.message)
       );
     }
@@ -683,13 +682,13 @@ module.exports = (client) => {
       if (message.channel.id !== LEGIT_CHECK_CHANNEL_ID) return;
       if (!message.content?.trim().toLowerCase().startsWith("+rep")) return;
 
-      const ticketId = pendingLegitTickets.get(message.author.id);
-      if (!ticketId) return;
-
-      // Każdy prawidłowy +rep na kanale LC jest liczony.
-      // Pełna synchronizacja z historią zapobiega rozjazdom licznika po restarcie.
+      // Każdy +rep na kanale LC jest liczony, również bez aktywnego ticketa.
+      // Pełna synchronizacja z historią uwzględnia stare wiadomości i restarty bota.
       store.confirmLatestPendingTransaction(message.author.id);
       await syncLegitCounterFromHistory(message.guild);
+
+      const ticketId = pendingLegitTickets.get(message.author.id);
+      if (!ticketId) return;
 
       const ticket = await message.guild.channels.fetch(ticketId).catch(() => null);
       if (!ticket) {
