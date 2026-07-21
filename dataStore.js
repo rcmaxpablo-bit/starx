@@ -1,155 +1,187 @@
-const fs = require('fs');
-const path = require('path');
+const {
+  EmbedBuilder,
+  ActionRowBuilder,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
+  Events,
+  MessageFlags
+} = require('discord.js');
+const { upsertPanel } = require('./panelManager');
+const store = require('./dataStore');
 
-const DATA_DIR = path.join(__dirname, 'data');
-const FILES = {
-  customers: path.join(DATA_DIR, 'customers.json'),
-  transactions: path.join(DATA_DIR, 'transactions.json'),
-  invites: path.join(DATA_DIR, 'invites.json'),
-  settings: path.join(DATA_DIR, 'settings.json')
-};
+module.exports = (client) => {
+  const PANEL_CHANNEL_ID = '1529242794621665371';
+  const COLOR = '#1b2dff';
 
-const DEFAULTS = {
-  customers: {},
-  transactions: [],
-  invites: {},
-  settings: {
-    legitCount: 0,
-    legitCounterChannelId: '',
-    legitCounterChannelPrefix: '✅・legitcheck➜',
-    customerPanelChannelId: '1529242794621665371'
+  // Emotki używane wcześniej w bocie.
+  const EMOJIS = {
+    arrow: { id: '1508094625984811038', animated: true },
+    lock: '<:lock:1501697222901895258>',
+    money: '<a:money:1501685438103031920>',
+    list: '<:LIST:1501693215328440370>',
+    people: '<:LUDZIE:1500243884733894716>',
+    shop: '<:SKLEP:1500243849535033577>'
+  };
+
+  const money = value => `${Number(value || 0).toFixed(2)} PLN`;
+  const discordDate = iso => iso
+    ? `<t:${Math.floor(new Date(iso).getTime() / 1000)}:d>`
+    : 'Brak';
+
+  function createMenu() {
+    return new StringSelectMenuBuilder()
+      .setCustomId('customer_panel_select')
+      .setPlaceholder('❌ | Nie wybrano żadnej opcji.')
+      .setMinValues(1)
+      .setMaxValues(1)
+      .addOptions(
+        new StringSelectMenuOptionBuilder()
+          .setLabel('Moje Statystyki')
+          .setDescription('Ile wydałeś i ile masz transakcji.')
+          .setValue('customer_stats')
+          .setEmoji(EMOJIS.arrow),
+        new StringSelectMenuOptionBuilder()
+          .setLabel('Historia Zakupów')
+          .setDescription('Twoje ostatnie 5 zakupów.')
+          .setValue('customer_history')
+          .setEmoji(EMOJIS.arrow),
+        new StringSelectMenuOptionBuilder()
+          .setLabel('Top 5 Klientów')
+          .setDescription('Ranking najwięcej wydających.')
+          .setValue('customer_top5')
+          .setEmoji(EMOJIS.arrow),
+        new StringSelectMenuOptionBuilder()
+          .setLabel('Sprawdź Zaproszenia')
+          .setDescription('Ile masz zaproszeń i kogo ostatnio zaprosiłeś.')
+          .setValue('customer_invites')
+          .setEmoji(EMOJIS.arrow)
+      );
   }
-};
 
-function clone(value) {
-  return JSON.parse(JSON.stringify(value));
-}
-
-function ensureDataFiles() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  for (const [key, file] of Object.entries(FILES)) {
-    if (!fs.existsSync(file)) {
-      fs.writeFileSync(file, JSON.stringify(DEFAULTS[key], null, 2), 'utf8');
+  async function sendPanel() {
+    const channel = await client.channels.fetch(PANEL_CHANNEL_ID).catch(() => null);
+    if (!channel?.isTextBased()) {
+      return console.log('❌ Nie znaleziono kanału panelu klienta.');
     }
+
+    const embed = new EmbedBuilder()
+      .setColor(COLOR)
+      .setTitle('🌟 StarX Exchange » PANEL KLIENTA')
+      .setDescription([
+        `${EMOJIS.lock} | Wybierz odpowiednią opcję poniżej.`,
+        '',
+        '━━━━━━━━━━━━━━━━━━━━━━━',
+        '',
+        `${EMOJIS.money} Statystyki i wydana kwota`,
+        `${EMOJIS.list} Historia ostatnich zakupów`,
+        `${EMOJIS.people} Zaproszenia`,
+        `${EMOJIS.shop} Top 5 klientów`,
+        '',
+        '━━━━━━━━━━━━━━━━━━━━━━━'
+      ].join('\n'))
+      .setFooter({ text: '© 2026 StarX Exchange • Panel Klienta' });
+
+    const row = new ActionRowBuilder().addComponents(createMenu());
+
+    await upsertPanel(
+      channel,
+      { embeds: [embed], components: [row] },
+      { customId: 'customer_panel_select', embedTitle: '🌟 StarX Exchange × PANEL KLIENTA' }
+    );
   }
-}
 
-function read(name) {
-  ensureDataFiles();
-  try {
-    return JSON.parse(fs.readFileSync(FILES[name], 'utf8'));
-  } catch (error) {
-    console.error(`DATA READ ERROR (${name}):`, error);
-    return clone(DEFAULTS[name]);
-  }
-}
+  client.once(Events.ClientReady, sendPanel);
 
-function write(name, value) {
-  ensureDataFiles();
-  const tmp = `${FILES[name]}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(value, null, 2), 'utf8');
-  fs.renameSync(tmp, FILES[name]);
-  return value;
-}
+  client.on(Events.InteractionCreate, async interaction => {
+    let selectedAction = null;
 
-function getCustomer(userId) {
-  const customers = read('customers');
-  return customers[userId] || {
-    userId,
-    spent: 0,
-    transactions: 0,
-    firstPurchaseAt: null,
-    lastPurchaseAt: null
-  };
-}
-
-function recordTransaction({ userId, amount, type, description, channelId, moderatorId, currency = 'PLN' }) {
-  const numericAmount = Number(amount) || 0;
-  const transactions = read('transactions');
-  const duplicate = transactions.find(tx => tx.channelId === channelId && tx.status === 'pending_rep');
-  if (duplicate) return { transaction: duplicate, created: false };
-
-  const now = new Date().toISOString();
-  const transaction = {
-    userId,
-    amount: numericAmount,
-    currency,
-    type: type || 'transaction',
-    description: description || type || 'Transakcja',
-    channelId,
-    moderatorId,
-    createdAt: now,
-    status: 'pending_rep',
-    confirmedAt: null
-  };
-  transactions.push(transaction);
-  write('transactions', transactions);
-
-  const customers = read('customers');
-  const customer = customers[userId] || {
-    userId,
-    spent: 0,
-    transactions: 0,
-    firstPurchaseAt: now,
-    lastPurchaseAt: now
-  };
-  customer.spent = Number(customer.spent || 0) + numericAmount;
-  customer.transactions = Number(customer.transactions || 0) + 1;
-  customer.firstPurchaseAt ||= now;
-  customer.lastPurchaseAt = now;
-  customers[userId] = customer;
-  write('customers', customers);
-
-  return { transaction, created: true, customer };
-}
-
-function confirmLatestPendingTransaction(userId) {
-  const transactions = read('transactions');
-  for (let i = transactions.length - 1; i >= 0; i -= 1) {
-    const tx = transactions[i];
-    if (tx.userId === userId && tx.status === 'pending_rep') {
-      tx.status = 'confirmed';
-      tx.confirmedAt = new Date().toISOString();
-      write('transactions', transactions);
-      return tx;
+    if (interaction.isStringSelectMenu() && interaction.customId === 'customer_panel_select') {
+      selectedAction = interaction.values[0];
     }
-  }
-  return null;
-}
 
-function incrementLegitCount() {
-  const settings = read('settings');
-  settings.legitCount = Number(settings.legitCount || 0) + 1;
-  write('settings', settings);
-  return settings.legitCount;
-}
+    // Zachowana zgodność ze starymi przyciskami, gdyby gdzieś została ich kopia.
+    if (interaction.isButton() && interaction.customId.startsWith('customer_')) {
+      selectedAction = interaction.customId;
+    }
 
-function getInviteCount(guildId, userId) {
-  const invites = read('invites');
-  return Number(invites?.[guildId]?.[userId] || 0);
-}
+    if (!selectedAction) return;
 
-function setInviteCount(guildId, userId, value) {
-  const invites = read('invites');
-  invites[guildId] ||= {};
-  invites[guildId][userId] = Math.max(0, Number(value) || 0);
-  write('invites', invites);
-  return invites[guildId][userId];
-}
+    try {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    } catch (error) {
+      console.log('❌ Nie udało się potwierdzić interakcji panelu klienta:', error);
+      return;
+    }
 
-function addInviteCount(guildId, userId, amount = 1) {
-  return setInviteCount(guildId, userId, getInviteCount(guildId, userId) + Number(amount || 0));
-}
+    if (selectedAction === 'customer_stats') {
+      const customer = store.getCustomer(interaction.user.id);
+      const embed = new EmbedBuilder()
+        .setColor(COLOR)
+        .setTitle(`${EMOJIS.money} Twoje Statystyki`)
+        .setDescription([
+          `**Wydano:** ${money(customer.spent)}`,
+          `**Liczba transakcji:** ${customer.transactions || 0}`,
+          `**Pierwszy zakup:** ${discordDate(customer.firstPurchaseAt)}`,
+          `**Ostatni zakup:** ${discordDate(customer.lastPurchaseAt)}`
+        ].join('\n'));
 
-module.exports = {
-  ensureDataFiles,
-  read,
-  write,
-  getCustomer,
-  recordTransaction,
-  confirmLatestPendingTransaction,
-  incrementLegitCount,
-  getInviteCount,
-  setInviteCount,
-  addInviteCount
+      return interaction.editReply({ embeds: [embed] });
+    }
+
+    if (selectedAction === 'customer_history') {
+      const history = store.read('transactions')
+        .filter(tx => tx.userId === interaction.user.id)
+        .slice(-5)
+        .reverse();
+
+      const description = history.length
+        ? history
+          .map((tx, index) => `**${index + 1}. ${tx.description}**\n${money(tx.amount)} • ${discordDate(tx.createdAt)}`)
+          .join('\n\n')
+        : 'Brak zapisanych zakupów.';
+
+      return interaction.editReply({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(COLOR)
+            .setTitle(`${EMOJIS.list} Ostatnie 5 Zakupów`)
+            .setDescription(description)
+        ]
+      });
+    }
+
+    if (selectedAction === 'customer_invites') {
+      const count = store.getInviteCount(interaction.guild.id, interaction.user.id);
+
+      return interaction.editReply({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(COLOR)
+            .setTitle(`${EMOJIS.people} Twoje Zaproszenia`)
+            .setDescription(`Masz **${count}** skutecznych zaproszeń.`)
+        ]
+      });
+    }
+
+    if (selectedAction === 'customer_top5') {
+      const customers = Object.values(store.read('customers'))
+        .sort((a, b) => Number(b.spent || 0) - Number(a.spent || 0))
+        .slice(0, 5);
+
+      const description = customers.length
+        ? customers
+          .map((customer, index) => `**${index + 1}.** <@${customer.userId}> — **${money(customer.spent)}** (${customer.transactions || 0} trans.)`)
+          .join('\n')
+        : 'Brak danych w rankingu.';
+
+      return interaction.editReply({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(COLOR)
+            .setTitle(`${EMOJIS.shop} Top 5 Klientów`)
+            .setDescription(description)
+        ]
+      });
+    }
+  });
 };
