@@ -8,7 +8,7 @@ const {
   TextInputStyle,
   Events
 } = require('discord.js');
-const { upsertPanel } = require('./panelManager');
+const { findPanelMessages, upsertPanel } = require('./panelManager');
 
 const EMOJI = {
   // =========================
@@ -238,11 +238,18 @@ ${stars(laczna)}`
           .setThumbnail(interaction.user.displayAvatarURL({ dynamic: true }))
           .setFooter({ text: '© 2026 StarX Exchange x Opinie Klientów' });
 
+        // Usuń dotychczasowy panel, aby nowa opinia pojawiła się nad świeżym panelem.
+        const oldPanels = await findPanelMessages(channel, { customId: "wystaw_opinie" });
+        for (const oldPanel of oldPanels) {
+          await oldPanel.delete().catch(() => {});
+        }
+        panelMessage = null;
+
         await channel.send({
           embeds: [embed]
         });
 
-        // Odśwież istniejący panel zamiast wysyłać kolejny.
+        // Wyślij nowy panel na samym dole kanału.
         await sendPanel();
 
         await interaction.reply({

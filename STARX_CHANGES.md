@@ -53,3 +53,8 @@ Zrobione pod wygląd ze screenów, ale z brandingiem **🌟 StarX Exchange**.
 - Zmiana obejmuje: tickety, cennik, prowizje, kalkulator prowizji, regulamin, weryfikację, opinie, legit check i panel `+rep`.
 - Liczniki głosów w panelu legit check są zachowywane podczas restartu.
 - Minimalna prowizja 3 PLN pozostaje bez zmian.
+
+## Panel opinii zawsze na dole kanału
+- Po wysłaniu opinii stary panel „Wystaw opinię” jest usuwany.
+- Opinia jest publikowana jako nowa wiadomość.
+- Następnie bot wysyła świeży panel pod opinią, dzięki czemu przycisk pozostaje na dole kanału.

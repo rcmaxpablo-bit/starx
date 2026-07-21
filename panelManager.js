@@ -72,6 +72,7 @@ async function upsertPanel(channel, payload, options = {}) {
 }
 
 module.exports = {
+  findPanelMessages,
   findPanelMessage,
   upsertPanel
 };
