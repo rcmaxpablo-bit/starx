@@ -145,6 +145,46 @@ module.exports = (client) => {
     }
   }
 
+  // Liczy wszystkie istniejące wiadomości +rep z historii kanału LC.
+  // Dzięki temu licznik działa również dla wiadomości wysłanych przed aktualizacją bota.
+  async function syncLegitCounterFromHistory(guild) {
+    if (!guild) return 0;
+
+    const legitChannel = await guild.channels.fetch(LEGIT_CHECK_CHANNEL_ID).catch(() => null);
+    if (!legitChannel?.messages?.fetch) {
+      console.log("LEGIT HISTORY SYNC: nie znaleziono kanału LC lub brak dostępu do historii.");
+      return Number(store.read("settings").legitCount || 0);
+    }
+
+    let before;
+    let total = 0;
+
+    while (true) {
+      const batch = await legitChannel.messages.fetch({
+        limit: 100,
+        ...(before ? { before } : {})
+      }).catch(err => {
+        console.log("LEGIT HISTORY FETCH ERROR:", err.message);
+        return null;
+      });
+
+      if (!batch || batch.size === 0) break;
+
+      for (const msg of batch.values()) {
+        if (msg.author?.bot) continue;
+        if (msg.content?.trim().toLowerCase().startsWith("+rep")) total += 1;
+      }
+
+      before = batch.last().id;
+      if (batch.size < 100) break;
+    }
+
+    store.setLegitCount(total);
+    await updateLegitCounterChannel(guild, total);
+    console.log(`✅ Licznik LC zsynchronizowany z historią: ${total}`);
+    return total;
+  }
+
   function ticketButtons(isClaimed = false) {
     return new ActionRowBuilder().addComponents(
       new ButtonBuilder()
@@ -627,6 +667,14 @@ module.exports = (client) => {
   // =========================================
   // INTERACTIONS
   // =========================================
+  // Przy każdym uruchomieniu policz także stare wiadomości +rep.
+  client.once(Events.ClientReady, async () => {
+    const guild = client.guilds.cache.first();
+    await syncLegitCounterFromHistory(guild).catch(err =>
+      console.log("LEGIT HISTORY SYNC ERROR:", err)
+    );
+  });
+
   // Po tym jak klient faktycznie wyśle legit checka na kanał LC,
   // dopiero wtedy zabierz mu dostęp do ticketa. Dzięki temu może skopiować wzór z ticketa.
   client.on(Events.MessageCreate, async (message) => {
@@ -638,11 +686,10 @@ module.exports = (client) => {
       const ticketId = pendingLegitTickets.get(message.author.id);
       if (!ticketId) return;
 
-      const confirmedTransaction = store.confirmLatestPendingTransaction(message.author.id);
-      if (confirmedTransaction) {
-        const count = store.incrementLegitCount();
-        await updateLegitCounterChannel(message.guild, count);
-      }
+      // Każdy prawidłowy +rep na kanale LC jest liczony.
+      // Pełna synchronizacja z historią zapobiega rozjazdom licznika po restarcie.
+      store.confirmLatestPendingTransaction(message.author.id);
+      await syncLegitCounterFromHistory(message.guild);
 
       const ticket = await message.guild.channels.fetch(ticketId).catch(() => null);
       if (!ticket) {
