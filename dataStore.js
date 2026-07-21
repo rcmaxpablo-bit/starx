@@ -1,120 +1,161 @@
-const {
-  EmbedBuilder,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  Events,
-  MessageFlags
-} = require('discord.js');
-const { upsertPanel } = require('./panelManager');
-const store = require('./dataStore');
+const fs = require('fs');
+const path = require('path');
 
-module.exports = (client) => {
-  const PANEL_CHANNEL_ID = '1529242794621665371';
-  const COLOR = '#1b2dff';
+const DATA_DIR = path.join(__dirname, 'data');
+const FILES = {
+  customers: path.join(DATA_DIR, 'customers.json'),
+  transactions: path.join(DATA_DIR, 'transactions.json'),
+  invites: path.join(DATA_DIR, 'invites.json'),
+  settings: path.join(DATA_DIR, 'settings.json')
+};
 
-  const money = value => `${Number(value || 0).toFixed(2)} PLN`;
-  const discordDate = iso => iso
-    ? `<t:${Math.floor(new Date(iso).getTime() / 1000)}:d>`
-    : 'Brak';
-
-  function createButtons() {
-    return [
-      new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId('customer_stats')
-          .setLabel('Moje Statystyki')
-          .setEmoji('📊')
-          .setStyle(ButtonStyle.Primary),
-        new ButtonBuilder()
-          .setCustomId('customer_history')
-          .setLabel('Historia zakupów')
-          .setEmoji('📜')
-          .setStyle(ButtonStyle.Secondary)
-      ),
-      new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setCustomId('customer_invites')
-          .setLabel('Zaproszenia')
-          .setEmoji('👥')
-          .setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder()
-          .setCustomId('customer_top5')
-          .setLabel('Top 5 klientów')
-          .setEmoji('🏆')
-          .setStyle(ButtonStyle.Secondary)
-      )
-    ];
+const DEFAULTS = {
+  customers: {},
+  transactions: [],
+  invites: {},
+  settings: {
+    legitCount: 0,
+    legitCounterChannelId: '',
+    legitCounterChannelPrefix: '✅・legitcheck➜',
+    customerPanelChannelId: '1529242794621665371'
   }
+};
 
-  async function sendPanel() {
-    const channel = await client.channels.fetch(PANEL_CHANNEL_ID).catch(() => null);
-    if (!channel?.isTextBased()) {
-      return console.log('❌ Nie znaleziono kanału panelu klienta.');
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function ensureDataFiles() {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  for (const [key, file] of Object.entries(FILES)) {
+    if (!fs.existsSync(file)) {
+      fs.writeFileSync(file, JSON.stringify(DEFAULTS[key], null, 2), 'utf8');
     }
-
-    const embed = new EmbedBuilder()
-      .setColor(COLOR)
-      .setTitle('🌟 StarX Exchange » PANEL KLIENTA')
-      .setDescription('Wybierz opcję poniżej, aby sprawdzić swoje dane i ranking klientów.')
-      .setFooter({ text: '© 2026 StarX Exchange' });
-
-    await upsertPanel(
-      channel,
-      { embeds: [embed], components: createButtons() },
-      { customId: 'customer_stats', embedTitle: '🌟 StarX Exchange » PANEL KLIENTA' }
-    );
   }
+}
 
-  client.once(Events.ClientReady, sendPanel);
+function read(name) {
+  ensureDataFiles();
+  try {
+    return JSON.parse(fs.readFileSync(FILES[name], 'utf8'));
+  } catch (error) {
+    console.error(`DATA READ ERROR (${name}):`, error);
+    return clone(DEFAULTS[name]);
+  }
+}
 
-  client.on(Events.InteractionCreate, async interaction => {
-    if (!interaction.isButton() || !interaction.customId.startsWith('customer_')) return;
+function write(name, value) {
+  ensureDataFiles();
+  const tmp = `${FILES[name]}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(value, null, 2), 'utf8');
+  fs.renameSync(tmp, FILES[name]);
+  return value;
+}
 
-    try {
-      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    } catch (error) {
-      console.log('❌ Nie udało się potwierdzić interakcji panelu klienta:', error);
-      return;
+function getCustomer(userId) {
+  const customers = read('customers');
+  return customers[userId] || {
+    userId,
+    spent: 0,
+    transactions: 0,
+    firstPurchaseAt: null,
+    lastPurchaseAt: null
+  };
+}
+
+function recordTransaction({ userId, amount, type, description, channelId, moderatorId, currency = 'PLN' }) {
+  const numericAmount = Number(amount) || 0;
+  const transactions = read('transactions');
+  const duplicate = transactions.find(tx => tx.channelId === channelId && tx.status === 'pending_rep');
+  if (duplicate) return { transaction: duplicate, created: false };
+
+  const now = new Date().toISOString();
+  const transaction = {
+    userId,
+    amount: numericAmount,
+    currency,
+    type: type || 'transaction',
+    description: description || type || 'Transakcja',
+    channelId,
+    moderatorId,
+    createdAt: now,
+    status: 'pending_rep',
+    confirmedAt: null
+  };
+  transactions.push(transaction);
+  write('transactions', transactions);
+
+  const customers = read('customers');
+  const customer = customers[userId] || {
+    userId,
+    spent: 0,
+    transactions: 0,
+    firstPurchaseAt: now,
+    lastPurchaseAt: now
+  };
+  customer.spent = Number(customer.spent || 0) + numericAmount;
+  customer.transactions = Number(customer.transactions || 0) + 1;
+  customer.firstPurchaseAt ||= now;
+  customer.lastPurchaseAt = now;
+  customers[userId] = customer;
+  write('customers', customers);
+
+  return { transaction, created: true, customer };
+}
+
+function confirmLatestPendingTransaction(userId) {
+  const transactions = read('transactions');
+  for (let i = transactions.length - 1; i >= 0; i -= 1) {
+    const tx = transactions[i];
+    if (tx.userId === userId && tx.status === 'pending_rep') {
+      tx.status = 'confirmed';
+      tx.confirmedAt = new Date().toISOString();
+      write('transactions', transactions);
+      return tx;
     }
+  }
+  return null;
+}
 
-    if (interaction.customId === 'customer_stats') {
-      const customer = store.getCustomer(interaction.user.id);
-      return interaction.editReply({ embeds: [new EmbedBuilder()
-        .setColor(COLOR)
-        .setTitle('📊 Moje Statystyki')
-        .setDescription([
-          `**Wydano:** ${money(customer.spent)}`,
-          `**Liczba transakcji:** ${customer.transactions || 0}`,
-          `**Pierwszy zakup:** ${discordDate(customer.firstPurchaseAt)}`,
-          `**Ostatni zakup:** ${discordDate(customer.lastPurchaseAt)}`
-        ].join('\n'))] });
-    }
+function setLegitCount(value) {
+  const settings = read('settings');
+  settings.legitCount = Math.max(0, Number(value) || 0);
+  write('settings', settings);
+  return settings.legitCount;
+}
 
-    if (interaction.customId === 'customer_history') {
-      const history = store.read('transactions')
-        .filter(tx => tx.userId === interaction.user.id)
-        .slice(-5)
-        .reverse();
-      const description = history.length
-        ? history.map((tx, i) => `**${i + 1}. ${tx.description}**\n${money(tx.amount)} • ${discordDate(tx.createdAt)}`).join('\n\n')
-        : 'Brak zapisanych zakupów.';
-      return interaction.editReply({ embeds: [new EmbedBuilder().setColor(COLOR).setTitle('📜 Historia zakupów').setDescription(description)] });
-    }
+function incrementLegitCount() {
+  const settings = read('settings');
+  return setLegitCount(Number(settings.legitCount || 0) + 1);
+}
 
-    if (interaction.customId === 'customer_invites') {
-      const count = store.getInviteCount(interaction.guild.id, interaction.user.id);
-      return interaction.editReply({ embeds: [new EmbedBuilder().setColor(COLOR).setTitle('👥 Zaproszenia').setDescription(`Masz **${count}** skutecznych zaproszeń.`)] });
-    }
+function getInviteCount(guildId, userId) {
+  const invites = read('invites');
+  return Number(invites?.[guildId]?.[userId] || 0);
+}
 
-    if (interaction.customId === 'customer_top5') {
-      const customers = Object.values(store.read('customers'))
-        .sort((a, b) => Number(b.spent || 0) - Number(a.spent || 0))
-        .slice(0, 5);
-      const description = customers.length
-        ? customers.map((c, i) => `**${i + 1}.** <@${c.userId}> — **${money(c.spent)}** (${c.transactions || 0} trans.)`).join('\n')
-        : 'Brak danych w rankingu.';
-      return interaction.editReply({ embeds: [new EmbedBuilder().setColor(COLOR).setTitle('🏆 Top 5 klientów').setDescription(description)] });
-    }
-  });
+function setInviteCount(guildId, userId, value) {
+  const invites = read('invites');
+  invites[guildId] ||= {};
+  invites[guildId][userId] = Math.max(0, Number(value) || 0);
+  write('invites', invites);
+  return invites[guildId][userId];
+}
+
+function addInviteCount(guildId, userId, amount = 1) {
+  return setInviteCount(guildId, userId, getInviteCount(guildId, userId) + Number(amount || 0));
+}
+
+module.exports = {
+  ensureDataFiles,
+  read,
+  write,
+  getCustomer,
+  recordTransaction,
+  confirmLatestPendingTransaction,
+  setLegitCount,
+  incrementLegitCount,
+  getInviteCount,
+  setInviteCount,
+  addInviteCount
 };

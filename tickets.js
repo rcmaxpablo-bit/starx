@@ -668,10 +668,20 @@ module.exports = (client) => {
   // =========================================
   // Przy każdym uruchomieniu policz także stare wiadomości +rep.
   client.once(Events.ClientReady, async () => {
-    const guild = client.guilds.cache.first();
-    await syncLegitCounterFromHistory(guild).catch(err =>
-      console.log("LEGIT HISTORY SYNC ERROR:", err)
-    );
+    const legitChannel = await client.channels.fetch(LEGIT_CHECK_CHANNEL_ID).catch(err => {
+      console.log("LEGIT CHANNEL FETCH ERROR:", err.message);
+      return null;
+    });
+    const guild = legitChannel?.guild || client.guilds.cache.first();
+
+    const runSync = async () => {
+      await syncLegitCounterFromHistory(guild).catch(err =>
+        console.log("LEGIT HISTORY SYNC ERROR:", err)
+      );
+    };
+
+    await runSync();
+    setTimeout(runSync, 15000);
   });
 
   // Po tym jak klient faktycznie wyśle legit checka na kanał LC,
