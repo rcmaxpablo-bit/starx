@@ -144,6 +144,66 @@ module.exports = (client) => {
     }
   }
 
+  function parseLegitMessage(content) {
+    const text = String(content || '').trim();
+    if (!text.toLowerCase().startsWith('+rep')) return null;
+
+    const amountMatches = [...text.matchAll(/(\d+(?:[.,]\d{1,2})?)\s*pln\b/gi)];
+    const lastAmount = amountMatches.at(-1);
+    const amount = lastAmount ? Number(lastAmount[1].replace(',', '.')) : 0;
+
+    let description = text
+      .replace(/^\+rep\s*/i, '')
+      .replace(/<@!?\d+>/g, '')
+      .replace(/\b(?:purchased|exchanged|bought|zakupiono|kupiono)\b/i, '')
+      .replace(/(\d+(?:[.,]\d{1,2})?)\s*pln\b.*$/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!description) description = 'Zakup z legit checka';
+    return { amount, description };
+  }
+
+  async function resolveLegitCustomerId(message) {
+    if (!message.guild) return null;
+
+    // Zwykły +rep przypisujemy autorowi wiadomości.
+    if (!message.webhookId && !message.author?.bot) return message.author?.id || null;
+
+    // Automatyczne LC wysyłane webhookiem ma nazwę: "username [ Automatyczne LC ]".
+    const rawName = String(message.author?.username || '').replace(/\s*\[.*$/i, '').trim();
+    if (!rawName) return null;
+
+    await message.guild.members.fetch().catch(() => null);
+    const lowered = rawName.toLowerCase();
+    const member = message.guild.members.cache.find(m => {
+      const names = [m.user.username, m.user.globalName, m.displayName].filter(Boolean);
+      return names.some(name => String(name).toLowerCase() === lowered);
+    });
+    return member?.id || null;
+  }
+
+  async function importLegitMessageToCustomer(message, source = 'legit_history') {
+    const parsed = parseLegitMessage(message.content);
+    if (!parsed) return { created: false, reason: 'not_rep' };
+
+    const userId = await resolveLegitCustomerId(message);
+    if (!userId) {
+      console.log(`LEGIT IMPORT: nie udało się przypisać klienta dla wiadomości ${message.id}.`);
+      return { created: false, reason: 'customer_not_found' };
+    }
+
+    return store.importLegitTransaction({
+      messageId: message.id,
+      userId,
+      amount: parsed.amount,
+      description: parsed.description,
+      channelId: message.channel.id,
+      createdAt: message.createdAt?.toISOString?.() || new Date().toISOString(),
+      source
+    });
+  }
+
   // Liczy wszystkie istniejące wiadomości +rep z historii kanału LC.
   // Dzięki temu licznik działa również dla wiadomości wysłanych przed aktualizacją bota.
   async function syncLegitCounterFromHistory(guild) {
@@ -172,7 +232,10 @@ module.exports = (client) => {
       for (const msg of batch.values()) {
         // Liczymy także wiadomości botów i webhooków (np. Automatyczne LC),
         // o ile ich treść zaczyna się od +rep.
-        if (msg.content?.trim().toLowerCase().startsWith("+rep")) total += 1;
+        if (msg.content?.trim().toLowerCase().startsWith("+rep")) {
+          total += 1;
+          await importLegitMessageToCustomer(msg, 'legit_history');
+        }
       }
 
       before = batch.last().id;
@@ -695,7 +758,13 @@ module.exports = (client) => {
 
       // Każdy +rep na kanale LC jest liczony, również bez aktywnego ticketa.
       // Pełna synchronizacja z historią uwzględnia stare wiadomości i restarty bota.
-      store.confirmLatestPendingTransaction(message.author.id);
+      const confirmed = !message.webhookId && !message.author.bot
+        ? store.confirmLatestPendingTransaction(message.author.id)
+        : null;
+
+      // Gdy nie ma transakcji zapisanej przez Green Marker, utwórz ją bezpośrednio
+      // z treści +rep. Dzięki temu Panel Klienta uwzględnia także stare i automatyczne LC.
+      if (!confirmed) await importLegitMessageToCustomer(message, 'legit_live');
       await syncLegitCounterFromHistory(message.guild);
 
       const ticketId = pendingLegitTickets.get(message.author.id);
