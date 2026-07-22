@@ -1,261 +1,315 @@
-const {
-  EmbedBuilder,
-  ActionRowBuilder,
-  StringSelectMenuBuilder,
-  StringSelectMenuOptionBuilder,
-  Events,
-  MessageFlags,
-  PermissionFlagsBits
-} = require('discord.js');
-const { upsertPanel } = require('./panelManager');
-const store = require('./dataStore');
+const fs = require('fs');
+const path = require('path');
 
-const EMOJI = {
-  ticket: '<:TICKET:1501697124734206032>',
-  pin: '<:PIN:1501697389050986546>',
-  zap: '<:PIORUN:1501697151737139350>',
-  lock: '<:ZAMKNIETE:1501697222901895258>',
-  unlock: '<:OTWARTE:1510596058470809690>',
-  warning: '<:PILNE:1501693444030992395>',
-  support: '<:WSPARCIE:1500243961124618381>',
-  admin: '<:ADM:1501989271077388500>',
-  list: '<:LIST:1501693215328440370>',
-  clock: '<:CZAS:1502030015943151868>',
-  money: '<a:m_:1501685438103031920>',
-  arrow: '<a:Arrow_White:1508094625984811038>',
-  middleman: '<:LUDZIE:1500243884733894716>',
-  cart: '<:SKLEP:1500243849535033577>'
+const DATA_DIR = path.join(__dirname, 'data');
+const FILES = {
+  customers: path.join(DATA_DIR, 'customers.json'),
+  transactions: path.join(DATA_DIR, 'transactions.json'),
+  invites: path.join(DATA_DIR, 'invites.json'),
+  settings: path.join(DATA_DIR, 'settings.json')
 };
 
-const MENU_EMOJI = {
-  stats: { id: '1501685438103031920', animated: true },
-  history: { id: '1501693215328440370' },
-  top5: { id: '1501989271077388500' },
-  invites: { id: '1500243884733894716' }
+const DEFAULTS = {
+  customers: {},
+  transactions: [],
+  invites: {},
+  settings: {
+    legitCount: 0,
+    legitCounterChannelId: '',
+    legitCounterChannelPrefix: '✅・legitcheck➜',
+    customerPanelChannelId: '1529242794621665371'
+  }
 };
 
-module.exports = (client) => {
-  const PANEL_CHANNEL_ID = '1529242794621665371';
-  const COLOR = '#1b2dff';
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
 
-  const money = value => `${Number(value || 0).toFixed(2)} PLN`;
-  const discordDate = iso => iso
-    ? `<t:${Math.floor(new Date(iso).getTime() / 1000)}:d>`
-    : 'Brak';
-
-  function baseEmbed(title) {
-    return new EmbedBuilder()
-      .setColor(COLOR)
-      .setTitle(title)
-      .setFooter({ text: '© 2026 StarX Exchange' });
-  }
-
-  function createMenu() {
-    const menu = new StringSelectMenuBuilder()
-      .setCustomId('customer_panel_select_v3')
-      .setPlaceholder('❌ | Nie wybrano żadnej opcji.')
-      .addOptions(
-        new StringSelectMenuOptionBuilder()
-          .setLabel('Moje Statystyki')
-          .setDescription('Sprawdź wydaną kwotę i liczbę transakcji.')
-          .setValue('stats')
-          .setEmoji(MENU_EMOJI.stats),
-        new StringSelectMenuOptionBuilder()
-          .setLabel('Historia Zakupów')
-          .setDescription('Zobacz swoich 5 ostatnich zakupów.')
-          .setValue('history')
-          .setEmoji(MENU_EMOJI.history),
-        new StringSelectMenuOptionBuilder()
-          .setLabel('Top 5 Klientów')
-          .setDescription('Ranking klientów wydających najwięcej.')
-          .setValue('top5')
-          .setEmoji(MENU_EMOJI.top5),
-        new StringSelectMenuOptionBuilder()
-          .setLabel('Sprawdź Zaproszenia')
-          .setDescription('Sprawdź liczbę swoich zaproszeń.')
-          .setValue('invites')
-          .setEmoji(MENU_EMOJI.invites)
-      );
-
-    return new ActionRowBuilder().addComponents(menu);
-  }
-
-  let panelSendInProgress = false;
-
-  async function resolvePanelChannel() {
-    try {
-      const direct = await client.channels.fetch(PANEL_CHANNEL_ID);
-      if (direct?.isTextBased() && typeof direct.send === 'function') return direct;
-      console.error(`❌ Kanał ${PANEL_CHANNEL_ID} istnieje, ale nie obsługuje wysyłania wiadomości. Typ: ${direct?.type}`);
-      return null;
-    } catch (error) {
-      console.error(`❌ Nie udało się pobrać kanału Panelu Klienta ${PANEL_CHANNEL_ID}:`, error?.message || error);
-
-      // Druga próba przez cache/fetch kanałów każdej gildii. Pomaga, gdy globalny fetch
-      // nie zwrócił kanału mimo tego, że bot jest na właściwym serwerze.
-      for (const guild of client.guilds.cache.values()) {
-        try {
-          const channel = await guild.channels.fetch(PANEL_CHANNEL_ID);
-          if (channel?.isTextBased() && typeof channel.send === 'function') return channel;
-        } catch (_) {}
-      }
-      return null;
+function ensureDataFiles() {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  for (const [key, file] of Object.entries(FILES)) {
+    if (!fs.existsSync(file)) {
+      fs.writeFileSync(file, JSON.stringify(DEFAULTS[key], null, 2), 'utf8');
     }
   }
+}
 
-  async function sendPanel(reason = 'start') {
-    if (panelSendInProgress) return false;
-    panelSendInProgress = true;
+function read(name) {
+  ensureDataFiles();
+  try {
+    return JSON.parse(fs.readFileSync(FILES[name], 'utf8'));
+  } catch (error) {
+    console.error(`DATA READ ERROR (${name}):`, error);
+    return clone(DEFAULTS[name]);
+  }
+}
 
-    try {
-      console.log(`ℹ️ Próba wysłania Panelu Klienta (${reason}) na kanał ${PANEL_CHANNEL_ID}...`);
-      const channel = await resolvePanelChannel();
-      if (!channel) return false;
+function write(name, value) {
+  ensureDataFiles();
+  const tmp = `${FILES[name]}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(value, null, 2), 'utf8');
+  fs.renameSync(tmp, FILES[name]);
+  return value;
+}
 
-      const me = channel.guild?.members?.me;
-      const permissions = me ? channel.permissionsFor(me) : null;
-      if (permissions && !permissions.has(PermissionFlagsBits.ViewChannel)) {
-        console.error(`❌ Bot nie ma uprawnienia ViewChannel na kanale ${PANEL_CHANNEL_ID}.`);
-        return false;
-      }
-      if (permissions && !permissions.has(PermissionFlagsBits.SendMessages)) {
-        console.error(`❌ Bot nie ma uprawnienia SendMessages na kanale ${PANEL_CHANNEL_ID}.`);
-        return false;
-      }
-      if (permissions && !permissions.has(PermissionFlagsBits.EmbedLinks)) {
-        console.error(`❌ Bot nie ma uprawnienia EmbedLinks na kanale ${PANEL_CHANNEL_ID}.`);
-        return false;
-      }
+function getCustomer(userId) {
+  const customers = read('customers');
+  return customers[userId] || {
+    userId,
+    spent: 0,
+    transactions: 0,
+    firstPurchaseAt: null,
+    lastPurchaseAt: null
+  };
+}
 
-      const embed = new EmbedBuilder()
-        .setColor(COLOR)
-        .setTitle('StarX Exchange » PANEL KLIENTA')
-        .setDescription([
-          `${EMOJI.support} **Wybierz odpowiednią opcję z menu poniżej.**`,
-          '',
-          `${EMOJI.money} Statystyki wydatków i transakcji`,
-          `${EMOJI.list} Historia ostatnich zakupów`,
-          `${EMOJI.middleman} Twoje zaproszenia`,
-          `${EMOJI.admin} Ranking Top 5 klientów`
-        ].join('\n'))
-        .setFooter({ text: '© 2026 StarX Exchange » Panel Klienta' });
+function recordTransaction({ userId, amount, type, description, channelId, moderatorId, currency = 'PLN' }) {
+  const numericAmount = Number(amount) || 0;
+  const transactions = read('transactions');
+  const duplicate = transactions.find(tx => tx.channelId === channelId && tx.status === 'pending_rep');
+  if (duplicate) return { transaction: duplicate, created: false };
 
-      // Najpierw wyślij nowy panel. Stare wiadomości usuwamy dopiero po sukcesie,
-      // aby błąd uprawnień/fetch nie zostawił kanału bez panelu.
-      const newMessage = await channel.send({ embeds: [embed], components: [createMenu()] });
-      console.log(`✅ Wysłano nowy Panel Klienta. Kanał: ${channel.id}, wiadomość: ${newMessage.id}`);
+  const now = new Date().toISOString();
+  const transaction = {
+    userId,
+    amount: numericAmount,
+    currency,
+    type: type || 'transaction',
+    description: description || type || 'Transakcja',
+    channelId,
+    moderatorId,
+    createdAt: now,
+    status: 'pending_rep',
+    confirmedAt: null
+  };
+  transactions.push(transaction);
+  write('transactions', transactions);
 
-      try {
-        const messages = await channel.messages.fetch({ limit: 100 });
-        for (const message of messages.values()) {
-          if (message.id === newMessage.id || message.author?.id !== client.user.id) continue;
+  const customers = read('customers');
+  const customer = customers[userId] || {
+    userId,
+    spent: 0,
+    transactions: 0,
+    firstPurchaseAt: now,
+    lastPurchaseAt: now
+  };
+  customer.spent = Number(customer.spent || 0) + numericAmount;
+  customer.transactions = Number(customer.transactions || 0) + 1;
+  customer.firstPurchaseAt ||= now;
+  customer.lastPurchaseAt = now;
+  customers[userId] = customer;
+  write('customers', customers);
 
-          const isCustomerPanel = message.embeds?.some(e =>
-            String(e.title || '').toUpperCase().includes('PANEL KLIENTA')
-          );
-          const hasOldComponent = message.components?.some(row =>
-            row.components?.some(component =>
-              ['customer_panel_select', 'customer_panel_select_v2', 'customer_panel_select_v3'].includes(component.customId)
-            )
-          );
+  return { transaction, created: true, customer };
+}
 
-          if (isCustomerPanel || hasOldComponent) await message.delete().catch(() => {});
-        }
-      } catch (error) {
-        console.log('⚠️ Nowy panel wysłany, ale nie udało się usunąć starego:', error?.message || error);
-      }
+function importLegitTransaction({ messageId, userId, amount, description, channelId, createdAt, source = 'legit_history' }) {
+  if (!messageId || !userId) return { created: false, reason: 'missing_data' };
 
-      return true;
-    } catch (error) {
-      console.error(`❌ Błąd wysyłania Panelu Klienta na ${PANEL_CHANNEL_ID}:`, error?.stack || error);
-      return false;
-    } finally {
-      panelSendInProgress = false;
-    }
+  const transactions = read('transactions');
+  const duplicate = transactions.find(tx => tx.messageId === messageId);
+  if (duplicate) return { transaction: duplicate, created: false, reason: 'duplicate' };
+
+  const numericAmount = Number(amount) || 0;
+  const timestamp = createdAt || new Date().toISOString();
+  const transaction = {
+    messageId,
+    userId,
+    amount: numericAmount,
+    currency: 'PLN',
+    type: 'legit_check',
+    description: description || 'Legit check',
+    channelId,
+    moderatorId: null,
+    createdAt: timestamp,
+    status: 'confirmed',
+    confirmedAt: timestamp,
+    source
+  };
+
+  transactions.push(transaction);
+  write('transactions', transactions);
+
+  const customers = read('customers');
+  const customer = customers[userId] || {
+    userId,
+    spent: 0,
+    transactions: 0,
+    firstPurchaseAt: timestamp,
+    lastPurchaseAt: timestamp
+  };
+  customer.spent = Number(customer.spent || 0) + numericAmount;
+  customer.transactions = Number(customer.transactions || 0) + 1;
+  if (!customer.firstPurchaseAt || new Date(timestamp) < new Date(customer.firstPurchaseAt)) {
+    customer.firstPurchaseAt = timestamp;
+  }
+  if (!customer.lastPurchaseAt || new Date(timestamp) > new Date(customer.lastPurchaseAt)) {
+    customer.lastPurchaseAt = timestamp;
+  }
+  customers[userId] = customer;
+  write('customers', customers);
+
+  return { transaction, customer, created: true };
+}
+
+function confirmLatestPendingTransaction(userId, messageData = {}) {
+  const transactions = read('transactions');
+
+  // Każda wiadomość +rep ma własne messageId. Jeżeli była już zapisana,
+  // nie wolno naliczać jej drugi raz po restarcie ani ponownej synchronizacji.
+  if (messageData.messageId) {
+    const alreadyProcessed = transactions.find(tx => tx.messageId === messageData.messageId);
+    if (alreadyProcessed) return alreadyProcessed;
   }
 
-  async function sendPanelWithRetries() {
-    const delays = [0, 5000, 15000, 30000];
-    for (let i = 0; i < delays.length; i++) {
-      if (delays[i]) await new Promise(resolve => setTimeout(resolve, delays[i]));
-      if (await sendPanel(`próba ${i + 1}/${delays.length}`)) return;
+  for (let i = transactions.length - 1; i >= 0; i -= 1) {
+    const tx = transactions[i];
+    if (tx.userId === userId && tx.status === 'pending_rep') {
+      const confirmedAt = messageData.createdAt || new Date().toISOString();
+      tx.status = 'confirmed';
+      tx.confirmedAt = confirmedAt;
+      tx.messageId = messageData.messageId || tx.messageId || null;
+      tx.legitChannelId = messageData.channelId || tx.legitChannelId || null;
+      tx.legitContent = messageData.content || tx.legitContent || null;
+      tx.source = messageData.source || tx.source || 'legit_live';
+      write('transactions', transactions);
+      return tx;
     }
-    console.error(`❌ Panel Klienta nie został wysłany po ${delays.length} próbach. Sprawdź logi powyżej.`);
+  }
+  return null;
+}
+
+function rebuildCustomersFromTransactions() {
+  const transactions = read('transactions');
+  const customers = {};
+
+  for (const tx of transactions) {
+    if (!tx?.userId) continue;
+    const timestamp = tx.confirmedAt || tx.createdAt || new Date().toISOString();
+    const customer = customers[tx.userId] || {
+      userId: tx.userId,
+      spent: 0,
+      transactions: 0,
+      firstPurchaseAt: timestamp,
+      lastPurchaseAt: timestamp
+    };
+
+    customer.spent = Number(customer.spent || 0) + (Number(tx.amount) || 0);
+    customer.transactions = Number(customer.transactions || 0) + 1;
+    if (!customer.firstPurchaseAt || new Date(timestamp) < new Date(customer.firstPurchaseAt)) {
+      customer.firstPurchaseAt = timestamp;
+    }
+    if (!customer.lastPurchaseAt || new Date(timestamp) > new Date(customer.lastPurchaseAt)) {
+      customer.lastPurchaseAt = timestamp;
+    }
+    customers[tx.userId] = customer;
   }
 
-  if (client.isReady()) sendPanelWithRetries();
-  else client.once(Events.ClientReady, sendPanelWithRetries);
+  write('customers', customers);
+  return customers;
+}
 
-  client.on(Events.InteractionCreate, async interaction => {
-    if (interaction.isChatInputCommand() && interaction.commandName === 'panelklienta') {
-      if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: '❌ Brak uprawnień.', flags: MessageFlags.Ephemeral });
-      }
+function removeLegitTransactionByMessageId(messageId) {
+  if (!messageId) return { removed: false, reason: 'missing_message_id' };
 
-      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-      const sent = await sendPanel('komenda /panelklienta');
-      return interaction.editReply(sent
-        ? `✅ Wysłano nowy Panel Klienta na <#${PANEL_CHANNEL_ID}>.`
-        : `❌ Nie udało się wysłać panelu na <#${PANEL_CHANNEL_ID}>. Sprawdź konsolę bota.`
-      );
-    }
+  const transactions = read('transactions');
+  const index = transactions.findIndex(tx => tx.messageId === messageId);
+  if (index === -1) return { removed: false, reason: 'not_found' };
 
-    const supportedPanelIds = new Set([
-      'customer_panel_select',
-      'customer_panel_select_v2',
-      'customer_panel_select_v3'
-    ]);
-    if (!interaction.isStringSelectMenu() || !supportedPanelIds.has(interaction.customId)) return;
+  const [transaction] = transactions.splice(index, 1);
+  write('transactions', transactions);
+  rebuildCustomersFromTransactions();
+  return { removed: true, transaction };
+}
 
-    // Odpowiadamy prywatnie NATYCHMIAST. deferReply jest pewniejsze dla menu
-    // niż deferUpdate + followUp i usuwa komunikat „aplikacja nie odpowiedziała”.
-    try {
-      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    } catch (error) {
-      console.error('❌ PANEL KLIENTA ACK ERROR:', error?.message || error);
-      return;
-    }
+function updateLegitTransactionByMessageId(messageId, changes = {}) {
+  if (!messageId) return { updated: false, reason: 'missing_message_id' };
+  const transactions = read('transactions');
+  const transaction = transactions.find(tx => tx.messageId === messageId);
+  if (!transaction) return { updated: false, reason: 'not_found' };
 
-    const selected = interaction.values?.[0];
-    const sendPrivate = payload => interaction.editReply(payload)
-      .catch(error => console.error('❌ PANEL KLIENTA RESPONSE ERROR:', error?.message || error));
+  if (changes.amount !== undefined) transaction.amount = Number(changes.amount) || 0;
+  if (changes.description !== undefined) transaction.description = changes.description || 'Legit check';
+  if (changes.content !== undefined) transaction.legitContent = changes.content;
+  transaction.updatedAt = new Date().toISOString();
 
-    if (selected === 'stats') {
-      const customer = store.getCustomer(interaction.user.id);
-      return sendPrivate({ embeds: [baseEmbed('Moje Statystyki')
-        .setDescription([
-          `${EMOJI.money} **Wydano:** ${money(customer.spent)}`,
-          `${EMOJI.cart} **Liczba transakcji:** ${customer.transactions || 0}`,
-          `${EMOJI.clock} **Pierwszy zakup:** ${discordDate(customer.firstPurchaseAt)}`,
-          `${EMOJI.pin} **Ostatni zakup:** ${discordDate(customer.lastPurchaseAt)}`
-        ].join('\n'))] });
-    }
+  write('transactions', transactions);
+  rebuildCustomersFromTransactions();
+  return { updated: true, transaction };
+}
 
-    if (selected === 'history') {
-      const history = store.read('transactions')
-        .filter(tx => tx.userId === interaction.user.id)
-        .slice(-5)
-        .reverse();
-      const description = history.length
-        ? history.map((tx, i) => `${EMOJI.arrow} **${i + 1}. ${tx.description}**\n${EMOJI.money} ${money(tx.amount)}  ${EMOJI.clock} ${discordDate(tx.createdAt)}`).join('\n\n')
-        : `${EMOJI.warning} Brak zapisanych zakupów.`;
-      return sendPrivate({ embeds: [baseEmbed('Historia Zakupów').setDescription(description)] });
-    }
+function setLegitCount(value) {
+  const settings = read('settings');
+  settings.legitCount = Math.max(0, Number(value) || 0);
+  write('settings', settings);
+  return settings.legitCount;
+}
 
-    if (selected === 'invites') {
-      const count = interaction.guild ? store.getInviteCount(interaction.guild.id, interaction.user.id) : 0;
-      return sendPrivate({ embeds: [baseEmbed('Sprawdź Zaproszenia')
-        .setDescription(`${EMOJI.middleman} Masz **${count}** skutecznych zaproszeń.\n\n${EMOJI.zap} Zapraszaj aktywnych użytkowników i rozwijaj społeczność StarX Exchange.`)] });
-    }
+function incrementLegitCount() {
+  const settings = read('settings');
+  return setLegitCount(Number(settings.legitCount || 0) + 1);
+}
 
-    if (selected === 'top5') {
-      const customers = Object.values(store.read('customers'))
-        .sort((a, b) => Number(b.spent || 0) - Number(a.spent || 0))
-        .slice(0, 5);
-      const description = customers.length
-        ? customers.map((c, i) => `${EMOJI.arrow} **${i + 1}.** <@${c.userId}>\n${EMOJI.money} **${money(c.spent)}** • ${EMOJI.cart} ${c.transactions || 0} trans.`).join('\n\n')
-        : `${EMOJI.warning} Brak danych w rankingu.`;
-      return sendPrivate({ embeds: [baseEmbed('Top 5 Klientów').setDescription(description)] });
-    }
-  });
+function getInviteCount(guildId, userId) {
+  const invites = read('invites');
+  return Number(invites?.[guildId]?.[userId] || 0);
+}
+
+function setInviteCount(guildId, userId, value) {
+  const invites = read('invites');
+  invites[guildId] ||= {};
+  invites[guildId][userId] = Math.max(0, Number(value) || 0);
+  write('invites', invites);
+  return invites[guildId][userId];
+}
+
+function addInviteCount(guildId, userId, amount = 1) {
+  return setInviteCount(guildId, userId, getInviteCount(guildId, userId) + Number(amount || 0));
+}
+
+function importInviteLog({ guildId, messageId, inviterId, total = null }) {
+  if (!guildId || !messageId || !inviterId) {
+    return { imported: false, reason: 'missing_data' };
+  }
+
+  const invites = read('invites');
+  invites[guildId] ||= {};
+  invites._importedMessages ||= {};
+
+  if (invites._importedMessages[messageId]) {
+    return { imported: false, reason: 'duplicate', total: getInviteCount(guildId, inviterId) };
+  }
+
+  const current = Number(invites[guildId][inviterId] || 0);
+  const parsedTotal = total === null || total === undefined ? null : Math.max(0, Number(total) || 0);
+  const next = parsedTotal === null ? current + 1 : Math.max(current, parsedTotal);
+
+  invites[guildId][inviterId] = next;
+  invites._importedMessages[messageId] = {
+    guildId,
+    inviterId,
+    importedAt: new Date().toISOString()
+  };
+  write('invites', invites);
+
+  return { imported: true, total: next };
+}
+
+module.exports = {
+  ensureDataFiles,
+  read,
+  write,
+  getCustomer,
+  recordTransaction,
+  importLegitTransaction,
+  confirmLatestPendingTransaction,
+  rebuildCustomersFromTransactions,
+  removeLegitTransactionByMessageId,
+  updateLegitTransactionByMessageId,
+  setLegitCount,
+  incrementLegitCount,
+  getInviteCount,
+  setInviteCount,
+  addInviteCount,
+  importInviteLog
 };
