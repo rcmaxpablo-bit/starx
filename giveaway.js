@@ -12,6 +12,7 @@ const {
 } = require("discord.js");
 
 const fs = require("fs");
+const path = require("path");
 
 module.exports = (client) => {
 
@@ -22,8 +23,9 @@ module.exports = (client) => {
     const GIVEAWAY_CHANNEL_ID =
         "1502022020487970948";
 
-    const DATA_FILE =
-        "./giveaways.json";
+    const DATA_DIR = path.join(__dirname, "data");
+    const DATA_FILE = path.join(DATA_DIR, "giveaways.json");
+    const LEGACY_DATA_FILE = path.join(__dirname, "giveaways.json");
 
     // =====================================
     // EMOJI
@@ -75,32 +77,30 @@ module.exports = (client) => {
     let giveaways = {};
 
     function saveData() {
-
-        fs.writeFileSync(
-            DATA_FILE,
-            JSON.stringify(
-                giveaways,
-                null,
-                2
-            )
-        );
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+        const temporaryFile = `${DATA_FILE}.tmp`;
+        fs.writeFileSync(temporaryFile, JSON.stringify(giveaways, null, 2), "utf8");
+        fs.renameSync(temporaryFile, DATA_FILE);
     }
 
     function loadData() {
-
-        if (
-            !fs.existsSync(DATA_FILE)
-        ) {
-
-            fs.writeFileSync(
-                DATA_FILE,
-                "{}"
-            );
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+        if (!fs.existsSync(DATA_FILE) && fs.existsSync(LEGACY_DATA_FILE)) {
+            fs.copyFileSync(LEGACY_DATA_FILE, DATA_FILE);
         }
+        if (!fs.existsSync(DATA_FILE)) saveData();
 
-        giveaways = JSON.parse(
-            fs.readFileSync(DATA_FILE)
-        );
+        try {
+            const parsed = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
+            giveaways = parsed && typeof parsed === "object" && !Array.isArray(parsed)
+                ? parsed
+                : {};
+        } catch (error) {
+            console.error("❌ Nie udało się odczytać giveaways.json, zachowuję uszkodzoną kopię:", error.message);
+            fs.copyFileSync(DATA_FILE, `${DATA_FILE}.broken-${Date.now()}`);
+            giveaways = {};
+            saveData();
+        }
     }
 
     loadData();
@@ -126,20 +126,30 @@ module.exports = (client) => {
     // =====================================
 
     function parseTime(time) {
+        const normalized = String(time || "").trim().toLowerCase();
+        const value = parseInt(normalized, 10);
+        if (!Number.isFinite(value) || value <= 0) return null;
 
-        const value =
-            parseInt(time);
-
-        if (time.endsWith("m"))
+        if (normalized.endsWith("m"))
             return value * 60000;
 
-        if (time.endsWith("h"))
+        if (normalized.endsWith("h"))
             return value * 3600000;
 
-        if (time.endsWith("d"))
+        if (normalized.endsWith("d"))
             return value * 86400000;
 
         return null;
+    }
+
+    function pickWinner(giveaway) {
+        if (!giveaway?.entries?.length) return null;
+        const users = [];
+        const bonus = Math.max(0, Number(giveaway.bonus) || 0);
+        for (const userId of giveaway.entries) {
+            for (let entry = 0; entry <= bonus; entry += 1) users.push(userId);
+        }
+        return users[Math.floor(Math.random() * users.length)] || null;
     }
 
     // =====================================
@@ -721,6 +731,37 @@ ${chunks[0] || "Brak uczestników"}`
             // =====================================
 
             if (
+                interaction.isChatInputCommand() &&
+                interaction.commandName === "reroll"
+            ) {
+                if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+                    return interaction.reply({
+                        content: `${EMOJI.red} Brak permisji`,
+                        ephemeral: true
+                    });
+                }
+
+                const id = interaction.options.getString("id");
+                const giveaway = giveaways[id];
+                if (!giveaway) {
+                    return interaction.reply({
+                        content: `${EMOJI.red} Nie znaleziono giveaway o ID: \`${id}\``,
+                        ephemeral: true
+                    });
+                }
+
+                const winner = pickWinner(giveaway);
+                if (!winner) {
+                    return interaction.reply({
+                        content: `${EMOJI.red} Brak uczestników`,
+                        ephemeral: true
+                    });
+                }
+
+                return interaction.reply({ content: `🔄 Nowy winner: <@${winner}>` });
+            }
+
+            if (
                 interaction.isButton() &&
                 interaction.customId.startsWith(
                     "reroll_"
@@ -750,9 +791,9 @@ ${chunks[0] || "Brak uczestników"}`
 
                 if (!g) return;
 
-                if (
-                    !g.entries.length
-                ) {
+                const winner = pickWinner(g);
+
+                if (!winner) {
 
                     return interaction.reply({
 
@@ -762,30 +803,6 @@ ${chunks[0] || "Brak uczestników"}`
                         ephemeral: true
                     });
                 }
-
-                let users = [];
-
-                for (const userId of g.entries) {
-
-                    users.push(userId);
-
-                    for (
-                        let i = 0;
-                        i < g.bonus;
-                        i++
-                    ) {
-
-                        users.push(userId);
-                    }
-                }
-
-                const winner =
-                    users[
-                        Math.floor(
-                            Math.random() *
-                            users.length
-                        )
-                    ];
 
                 return interaction.reply({
 
