@@ -1,0 +1,21 @@
+STARX FINAL FIX
+
+Najważniejsze zmiany:
+- jeden wspólny moduł customerLegitSystem.js obsługuje Panel Klienta i LC,
+- usunięto z listy modułów stare, dublujące się rep.js, customerPanel.js i legitCheckPanel.js,
+- licznik LC jest odbudowywany z całej historii kanału 1500893110048133253,
+- każda osobna wiadomość +rep liczy się osobno,
+- usunięcie/edycja +rep synchronizuje licznik i dane klienta,
+- panel LEGIT CHECK jest odświeżany po +rep,
+- Panel Klienta działa na 1529242794621665371 i odpowiada natychmiast ephemeral,
+- autorowi +rep jest odbierany dostęp do jego ticketa (nie oznaczonemu sprzedawcy).
+
+Railway:
+Po wgraniu wykonaj Redeploy. W logach szukaj:
+- PANEL KLIENTA
+- LC SYNC
+- LICZNIK LC
+- PANEL LC
+
+UWAGA: Discord ogranicza częstotliwość zmiany nazw kanałów. Gdy limit zadziała,
+bot zapisze poprawny wynik i ponowi zmianę nazwy po czasie podanym przez Discord.

@@ -72,12 +72,10 @@ const modules = [
   "./verify",
   "./propozycje",
   "./invites",
-  "./rep",
   "./lc",
   "./giveaway",
   "./przejmij",
-  "./customerPanel",
-  "./legitCheckPanel"
+  "./customerLegitSystem"
 ];
 
 for (const mod of modules) {

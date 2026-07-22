@@ -320,11 +320,13 @@ ${EMOJI.arrow} **Wklej na <#${REP_CHANNEL_ID}>**`
 
         try {
 
-            if (message.author.bot) return;
+            if (message.author.bot || message.webhookId) return;
             if (message.channel.id !== REP_CHANNEL_ID) return;
+            if (!/^\+rep(?:\s|$)/i.test(String(message.content || "").trim())) return;
 
             const guild = message.guild;
-            const clientId = message.mentions.users.first()?.id || message.author.id;
+            // Dostęp zabieramy autorowi +rep (klientowi), a nie oznaczonemu sprzedawcy.
+            const clientId = message.author.id;
 
             const ticket = guild.channels.cache.find(c =>
                 c.topic?.startsWith(clientId)
