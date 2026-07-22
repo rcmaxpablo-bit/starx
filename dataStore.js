@@ -44,6 +44,18 @@ function normalize(name, value) {
   return value;
 }
 
+function assertStoreName(name) {
+  if (!Object.prototype.hasOwnProperty.call(FILES, name)) {
+    throw new TypeError(`Unknown data store: ${name}`);
+  }
+}
+
+function writeFileAtomically(name, value) {
+  const tmp = `${FILES[name]}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(value, null, 2), 'utf8');
+  fs.renameSync(tmp, FILES[name]);
+}
+
 function ensureDataFiles() {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   for (const [key, file] of Object.entries(FILES)) {
@@ -59,9 +71,18 @@ function ensureDataFiles() {
 }
 
 function read(name) {
+  assertStoreName(name);
   ensureDataFiles();
   try {
-    return normalize(name, JSON.parse(fs.readFileSync(FILES[name], 'utf8')));
+    const parsed = JSON.parse(fs.readFileSync(FILES[name], 'utf8'));
+    const normalized = normalize(name, parsed);
+
+    // Napraw od razu starszy plik zapisany w złym formacie, np. `{}` zamiast
+    // tablicy transakcji. Następny restart odczyta już prawidłowy JSON.
+    if (JSON.stringify(parsed) !== JSON.stringify(normalized)) {
+      writeFileAtomically(name, normalized);
+    }
+    return normalized;
   } catch (error) {
     console.error(`DATA READ ERROR (${name}):`, error);
     return clone(DEFAULTS[name]);
@@ -69,11 +90,10 @@ function read(name) {
 }
 
 function write(name, value) {
+  assertStoreName(name);
   ensureDataFiles();
   value = normalize(name, value);
-  const tmp = `${FILES[name]}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(value, null, 2), 'utf8');
-  fs.renameSync(tmp, FILES[name]);
+  writeFileAtomically(name, value);
   return value;
 }
 
