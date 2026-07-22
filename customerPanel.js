@@ -4,7 +4,6 @@ const {
   ActionRowBuilder,
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
-  MessageFlags,
   PermissionFlagsBits
 } = require('discord.js');
 const store = require('./dataStore');
@@ -35,7 +34,8 @@ function isRep(content) {
 
 function amountFrom(content) {
   const matches = [...String(content || '').matchAll(/(\d+(?:[.,]\d{1,2})?)\s*pln\b/gi)];
-  return matches.length ? Number(matches.at(-1)[1].replace(',', '.')) || 0 : 0;
+  const last = matches.length ? matches[matches.length - 1] : null;
+  return last ? Number(last[1].replace(',', '.')) || 0 : 0;
 }
 
 function descriptionFrom(content) {
@@ -76,10 +76,10 @@ function customerPanelPayload() {
     .setCustomId(CUSTOMER_MENU_ID)
     .setPlaceholder('❌ | Nie wybrano żadnej opcji.')
     .addOptions(
-      new StringSelectMenuOptionBuilder().setLabel('Moje Statystyki').setDescription('Ile wydałeś i ile masz transakcji.').setValue('stats').setEmoji({ id: '1501685438103031920', animated: true }),
-      new StringSelectMenuOptionBuilder().setLabel('Historia Zakupów').setDescription('Twoje ostatnie 5 zakupów.').setValue('history').setEmoji({ id: '1501693215328440370' }),
-      new StringSelectMenuOptionBuilder().setLabel('Sprawdź Zaproszenia').setDescription('Ile masz zaproszeń.').setValue('invites').setEmoji({ id: '1500243884733894716' }),
-      new StringSelectMenuOptionBuilder().setLabel('Top 5 Klientów').setDescription('Ranking najwięcej wydających.').setValue('top5').setEmoji({ id: '1501989271077388500' })
+      { label: 'Moje Statystyki', description: 'Ile wydałeś i ile masz transakcji.', value: 'stats', emoji: { id: '1501685438103031920', animated: true } },
+      { label: 'Historia Zakupów', description: 'Twoje ostatnie 5 zakupów.', value: 'history', emoji: { id: '1501693215328440370' } },
+      { label: 'Sprawdź Zaproszenia', description: 'Ile masz zaproszeń.', value: 'invites', emoji: { id: '1500243884733894716' } },
+      { label: 'Top 5 Klientów', description: 'Ranking najwięcej wydających.', value: 'top5', emoji: { id: '1501989271077388500' } }
     );
 
   return { embeds: [embed], components: [new ActionRowBuilder().addComponents(menu)] };
@@ -304,12 +304,12 @@ module.exports = (client) => {
   client.on(Events.InteractionCreate, async interaction => {
     if (interaction.isChatInputCommand() && interaction.commandName === 'panelklienta') {
       if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: '❌ Brak uprawnień administratora.', flags: MessageFlags.Ephemeral }).catch(() => {});
+        return interaction.reply({ content: '❌ Brak uprawnień administratora.', ephemeral: true }).catch(() => {});
       }
 
       try {
         // Discord musi dostać potwierdzenie w ciągu 3 sekund.
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        await interaction.deferReply({ ephemeral: true });
         const message = await publishCustomerPanel(`/panelklienta przez ${interaction.user.id}`);
         return interaction.editReply({
           content: `✅ Panel Klienta został odświeżony na <#${CUSTOMER_PANEL_CHANNEL_ID}>.\nID wiadomości: \`${message.id}\``
@@ -318,7 +318,7 @@ module.exports = (client) => {
         console.error('❌ /panelklienta ERROR:', error?.stack || error);
         const text = `❌ Nie udało się wysłać Panelu Klienta na <#${CUSTOMER_PANEL_CHANNEL_ID}>. Sprawdź logi Railway: ${String(error?.message || error).slice(0, 500)}`;
         if (interaction.deferred || interaction.replied) return interaction.editReply({ content: text }).catch(() => {});
-        return interaction.reply({ content: text, flags: MessageFlags.Ephemeral }).catch(() => {});
+        return interaction.reply({ content: text, ephemeral: true }).catch(() => {});
       }
     }
     if (!interaction.isStringSelectMenu()) return;
@@ -327,10 +327,10 @@ module.exports = (client) => {
     try {
       // Odpowiedź wysyłamy natychmiast; brak deferUpdate/followUp eliminuje timeout starego menu.
       const payload = await responseFor(interaction);
-      await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });
+      await interaction.reply({ ...payload, ephemeral: true });
     } catch (err) {
       console.error('❌ PANEL INTERACTION:', err?.stack || err);
-      if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: '❌ Błąd Panelu Klienta. Sprawdź logi Railway.', flags: MessageFlags.Ephemeral }).catch(() => {});
+      if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: '❌ Błąd Panelu Klienta. Sprawdź logi Railway.', ephemeral: true }).catch(() => {});
     }
   });
 

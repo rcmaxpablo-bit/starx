@@ -43,6 +43,10 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel]
 });
 
+
+// Bot ma wiele niezależnych modułów Discord. Zwiększamy limit ostrzeżeń,
+// ale każdy moduł nadal jest ładowany tylko raz.
+client.setMaxListeners(30);
 console.log(
   "🚀 Uruchamianie StarX Exchange Bot..."
 );
@@ -83,13 +87,11 @@ for (const mod of modules) {
   try {
 
     require(mod)(client);
+    console.log(`✅ Moduł załadowany: ${mod}`);
 
   } catch (err) {
 
-    console.log(
-      `❌ Błąd modułu ${mod}:`,
-      err
-    );
+    console.error(`❌ Błąd modułu ${mod}:`, err?.stack || err);
   }
 }
 
