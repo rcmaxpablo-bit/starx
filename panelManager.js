@@ -2,6 +2,12 @@
  * Finds and updates a permanent Discord panel instead of sending a duplicate
  * after every bot restart. Older matching duplicates are removed safely.
  */
+const store = require('./dataStore');
+
+function panelKey(channel, options = {}) {
+  const marker = options.customId || options.embedTitle;
+  return marker ? `${channel.id}:${marker}` : null;
+}
 
 function hasCustomId(message, customId) {
   if (!customId) return false;
@@ -30,8 +36,15 @@ async function findPanelMessages(channel, options = {}) {
   if (!channel?.isTextBased?.() || !channel.messages?.fetch) return [];
 
   try {
-    const fetched = await channel.messages.fetch({ limit: 100 });
+    const key = panelKey(channel, options);
+    const savedId = key ? store.getPanelMessageId(key) : null;
+    const [fetched, saved] = await Promise.all([
+      channel.messages.fetch({ limit: 100 }),
+      savedId ? channel.messages.fetch(savedId).catch(() => null) : null
+    ]);
     const clientUserId = channel.client.user?.id;
+
+    if (saved) fetched.set(saved.id, saved);
 
     return [...fetched.values()]
       .filter(message => matchesPanel(message, clientUserId, options))
@@ -61,6 +74,9 @@ async function upsertPanel(channel, payload, options = {}) {
   } else {
     panelMessage = await channel.send(payload);
   }
+
+  const key = panelKey(channel, options);
+  if (key) store.setPanelMessageId(key, panelMessage.id);
 
   // Usuń wyłącznie starsze wiadomości tego samego panelu.
   for (const duplicate of messages.slice(1)) {
