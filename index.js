@@ -5,7 +5,8 @@ const {
   SlashCommandBuilder,
   REST,
   Routes,
-  PermissionFlagsBits
+  PermissionFlagsBits,
+  Partials
 } = require("discord.js");
 
 // =====================================
@@ -35,7 +36,11 @@ const client = new Client({
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent
-  ]
+  ],
+
+  // Dzięki partials bot dostaje także zdarzenia usunięcia wiadomości,
+  // których nie miał wcześniej w pamięci podręcznej.
+  partials: [Partials.Message, Partials.Channel]
 });
 
 console.log(

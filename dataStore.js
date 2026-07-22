@@ -152,18 +152,90 @@ function importLegitTransaction({ messageId, userId, amount, description, channe
   return { transaction, customer, created: true };
 }
 
-function confirmLatestPendingTransaction(userId) {
+function confirmLatestPendingTransaction(userId, messageData = {}) {
   const transactions = read('transactions');
+
+  // Każda wiadomość +rep ma własne messageId. Jeżeli była już zapisana,
+  // nie wolno naliczać jej drugi raz po restarcie ani ponownej synchronizacji.
+  if (messageData.messageId) {
+    const alreadyProcessed = transactions.find(tx => tx.messageId === messageData.messageId);
+    if (alreadyProcessed) return alreadyProcessed;
+  }
+
   for (let i = transactions.length - 1; i >= 0; i -= 1) {
     const tx = transactions[i];
     if (tx.userId === userId && tx.status === 'pending_rep') {
+      const confirmedAt = messageData.createdAt || new Date().toISOString();
       tx.status = 'confirmed';
-      tx.confirmedAt = new Date().toISOString();
+      tx.confirmedAt = confirmedAt;
+      tx.messageId = messageData.messageId || tx.messageId || null;
+      tx.legitChannelId = messageData.channelId || tx.legitChannelId || null;
+      tx.legitContent = messageData.content || tx.legitContent || null;
+      tx.source = messageData.source || tx.source || 'legit_live';
       write('transactions', transactions);
       return tx;
     }
   }
   return null;
+}
+
+function rebuildCustomersFromTransactions() {
+  const transactions = read('transactions');
+  const customers = {};
+
+  for (const tx of transactions) {
+    if (!tx?.userId) continue;
+    const timestamp = tx.confirmedAt || tx.createdAt || new Date().toISOString();
+    const customer = customers[tx.userId] || {
+      userId: tx.userId,
+      spent: 0,
+      transactions: 0,
+      firstPurchaseAt: timestamp,
+      lastPurchaseAt: timestamp
+    };
+
+    customer.spent = Number(customer.spent || 0) + (Number(tx.amount) || 0);
+    customer.transactions = Number(customer.transactions || 0) + 1;
+    if (!customer.firstPurchaseAt || new Date(timestamp) < new Date(customer.firstPurchaseAt)) {
+      customer.firstPurchaseAt = timestamp;
+    }
+    if (!customer.lastPurchaseAt || new Date(timestamp) > new Date(customer.lastPurchaseAt)) {
+      customer.lastPurchaseAt = timestamp;
+    }
+    customers[tx.userId] = customer;
+  }
+
+  write('customers', customers);
+  return customers;
+}
+
+function removeLegitTransactionByMessageId(messageId) {
+  if (!messageId) return { removed: false, reason: 'missing_message_id' };
+
+  const transactions = read('transactions');
+  const index = transactions.findIndex(tx => tx.messageId === messageId);
+  if (index === -1) return { removed: false, reason: 'not_found' };
+
+  const [transaction] = transactions.splice(index, 1);
+  write('transactions', transactions);
+  rebuildCustomersFromTransactions();
+  return { removed: true, transaction };
+}
+
+function updateLegitTransactionByMessageId(messageId, changes = {}) {
+  if (!messageId) return { updated: false, reason: 'missing_message_id' };
+  const transactions = read('transactions');
+  const transaction = transactions.find(tx => tx.messageId === messageId);
+  if (!transaction) return { updated: false, reason: 'not_found' };
+
+  if (changes.amount !== undefined) transaction.amount = Number(changes.amount) || 0;
+  if (changes.description !== undefined) transaction.description = changes.description || 'Legit check';
+  if (changes.content !== undefined) transaction.legitContent = changes.content;
+  transaction.updatedAt = new Date().toISOString();
+
+  write('transactions', transactions);
+  rebuildCustomersFromTransactions();
+  return { updated: true, transaction };
 }
 
 function setLegitCount(value) {
@@ -231,6 +303,9 @@ module.exports = {
   recordTransaction,
   importLegitTransaction,
   confirmLatestPendingTransaction,
+  rebuildCustomersFromTransactions,
+  removeLegitTransactionByMessageId,
+  updateLegitTransactionByMessageId,
   setLegitCount,
   incrementLegitCount,
   getInviteCount,

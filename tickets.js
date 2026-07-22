@@ -759,11 +759,18 @@ module.exports = (client) => {
       // Każdy +rep na kanale LC jest liczony, również bez aktywnego ticketa.
       // Pełna synchronizacja z historią uwzględnia stare wiadomości i restarty bota.
       const confirmed = !message.webhookId && !message.author.bot
-        ? store.confirmLatestPendingTransaction(message.author.id)
+        ? store.confirmLatestPendingTransaction(message.author.id, {
+            messageId: message.id,
+            channelId: message.channel.id,
+            content: message.content,
+            createdAt: message.createdAt?.toISOString?.() || new Date().toISOString(),
+            source: 'legit_live'
+          })
         : null;
 
-      // Gdy nie ma transakcji zapisanej przez Green Marker, utwórz ją bezpośrednio
-      // z treści +rep. Dzięki temu Panel Klienta uwzględnia także stare i automatyczne LC.
+      // Jedna osoba może wysłać dowolną liczbę +rep. Każda NOWA wiadomość
+      // (inne message.id) jest osobną transakcją. Pierwsza może jedynie potwierdzić
+      // oczekującą transakcję Green Markera, kolejne są dopisywane z treści LC.
       if (!confirmed) await importLegitMessageToCustomer(message, 'legit_live');
       await syncLegitCounterFromHistory(message.guild);
 
@@ -785,6 +792,57 @@ module.exports = (client) => {
       pendingLegitTickets.delete(message.author.id);
     } catch (err) {
       console.log("LEGIT ACCESS REMOVE ERROR:", err);
+    }
+  });
+
+  // Gdy wiadomość +rep zostanie usunięta, usuń także odpowiadającą jej
+  // transakcję, przelicz statystyki klienta i zaktualizuj licznik kanału.
+  client.on(Events.MessageDelete, async (message) => {
+    try {
+      if (message.channelId !== LEGIT_CHECK_CHANNEL_ID) return;
+
+      const result = store.removeLegitTransactionByMessageId(message.id);
+      if (result.removed) {
+        console.log(`LEGIT DELETE: usunięto transakcję dla wiadomości ${message.id}.`);
+      }
+
+      const guild = message.guild || message.channel?.guild || client.guilds.cache.first();
+      await syncLegitCounterFromHistory(guild);
+    } catch (err) {
+      console.log('LEGIT DELETE ERROR:', err);
+    }
+  });
+
+  // Edycja +rep również utrzymuje dane w zgodzie z kanałem. Zmiana kwoty
+  // aktualizuje statystyki, a usunięcie prefiksu +rep usuwa transakcję.
+  client.on(Events.MessageUpdate, async (oldMessage, newMessage) => {
+    try {
+      if (newMessage.channelId !== LEGIT_CHECK_CHANNEL_ID) return;
+
+      if (newMessage.partial) {
+        newMessage = await newMessage.fetch().catch(() => newMessage);
+      }
+
+      const parsed = parseLegitMessage(newMessage.content);
+      if (!parsed) {
+        store.removeLegitTransactionByMessageId(newMessage.id);
+      } else {
+        const updated = store.updateLegitTransactionByMessageId(newMessage.id, {
+          amount: parsed.amount,
+          description: parsed.description,
+          content: newMessage.content
+        });
+
+        // Wiadomość mogła zostać edytowana zanim została zapisana lokalnie.
+        if (!updated.updated) {
+          await importLegitMessageToCustomer(newMessage, 'legit_update');
+        }
+      }
+
+      const guild = newMessage.guild || newMessage.channel?.guild || client.guilds.cache.first();
+      await syncLegitCounterFromHistory(guild);
+    } catch (err) {
+      console.log('LEGIT UPDATE ERROR:', err);
     }
   });
 
