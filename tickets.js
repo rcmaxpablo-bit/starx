@@ -170,7 +170,8 @@ module.exports = (client) => {
       if (!batch || batch.size === 0) break;
 
       for (const msg of batch.values()) {
-        if (msg.author?.bot) continue;
+        // Liczymy także wiadomości botów i webhooków (np. Automatyczne LC),
+        // o ile ich treść zaczyna się od +rep.
         if (msg.content?.trim().toLowerCase().startsWith("+rep")) total += 1;
       }
 
@@ -688,7 +689,7 @@ module.exports = (client) => {
   // dopiero wtedy zabierz mu dostęp do ticketa. Dzięki temu może skopiować wzór z ticketa.
   client.on(Events.MessageCreate, async (message) => {
     try {
-      if (message.author.bot) return;
+      // Wiadomości automatycznych botów/webhooków również mają zwiększać LC.
       if (message.channel.id !== LEGIT_CHECK_CHANNEL_ID) return;
       if (!message.content?.trim().toLowerCase().startsWith("+rep")) return;
 
