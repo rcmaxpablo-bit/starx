@@ -155,6 +155,14 @@ module.exports = (client) => {
       try {
         const recent = await channel.messages.fetch({ limit: 100 });
         panels = [...recent.values()].filter(m => isCustomerPanelMessage(m, client.user.id));
+
+        // Panel może wypaść poza ostatnie 100 wiadomości. Zapamiętane ID
+        // pozwala nadal edytować dokładnie tę samą wiadomość po restarcie.
+        const savedId = store.getPanelMessageId(`${channel.id}:${CUSTOMER_MENU_ID}`);
+        if (savedId && !panels.some(message => message.id === savedId)) {
+          const saved = await channel.messages.fetch(savedId).catch(() => null);
+          if (saved && isCustomerPanelMessage(saved, client.user.id)) panels.push(saved);
+        }
       } catch (historyError) {
         console.warn('⚠️ PANEL KLIENTA: nie udało się odczytać historii, wysyłam nowy panel:', historyError?.message || historyError);
       }
@@ -172,6 +180,7 @@ module.exports = (client) => {
       }
 
       if (!target) target = await channel.send(customerPanelPayload());
+      store.setPanelMessageId(`${channel.id}:${CUSTOMER_MENU_ID}`, target.id);
 
       for (const old of panels) {
         if (old.id !== target.id) await old.delete().catch(() => {});
