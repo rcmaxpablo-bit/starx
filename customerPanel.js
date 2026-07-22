@@ -247,8 +247,8 @@ module.exports = (client) => {
 
   async function importRep(message, source) {
     const userId = await resolveCustomerId(message);
-    if (!userId) return;
-    store.importLegitTransaction({
+    if (!userId) return { created: false, reason: 'customer_not_found' };
+    return store.importLegitTransaction({
       messageId: message.id,
       userId,
       amount: amountFrom(message.content),
@@ -264,6 +264,7 @@ module.exports = (client) => {
     repIds.clear();
     let before;
     let scanned = 0;
+    let imported = 0;
     while (true) {
       const batch = await channel.messages.fetch({ limit: 100, ...(before ? { before } : {}) });
       if (!batch.size) break;
@@ -271,14 +272,18 @@ module.exports = (client) => {
       for (const msg of batch.values()) {
         if (!isRep(msg.content)) continue;
         repIds.add(msg.id);
-        await importRep(msg, 'legit_history');
+        const result = await importRep(msg, 'legit_history');
+        if (result?.created) imported += 1;
       }
       before = batch.last()?.id;
       if (batch.size < 100) break;
     }
+    // Odbudowa gwarantuje, że stare +rep pojawią się w statystykach także
+    // wtedy, gdy transakcje były już zapisane, ale customers.json był pusty.
+    store.rebuildCustomersFromTransactions();
     pendingCount = repIds.size;
     await renameCounter(pendingCount);
-    console.log(`✅ LC SYNC: ${pendingCount} wiadomości +rep (sprawdzono ${scanned})`);
+    console.log(`✅ LC SYNC: ${pendingCount} wiadomości +rep, dodano ${imported} starych wpisów (sprawdzono ${scanned})`);
   }
 
   async function responseFor(interaction) {
