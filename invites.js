@@ -22,6 +22,91 @@ module.exports = (client) => {
   const OWNER_ROLE_ID = "1499499185337012377";
 
   // ==========================
+  // IMPORT STARYCH LOGÓW
+  // ==========================
+  function parseInviteLogMessage(message) {
+    const parts = [message.content || ""];
+
+    for (const embed of message.embeds || []) {
+      if (embed.title) parts.push(embed.title);
+      if (embed.description) parts.push(embed.description);
+      for (const field of embed.fields || []) {
+        parts.push(field.name || "", field.value || "");
+      }
+    }
+
+    const text = parts.join("\n");
+    if (!/zaprosi[łl]|zaproszenie|invites?/i.test(text)) return null;
+
+    const inviterMatch = text.match(/zaprosi[łl]\s*:?\s*<@!?(\d{17,20})>/i)
+      || text.match(/inviter\s*:?\s*<@!?(\d{17,20})>/i);
+    if (!inviterMatch) return null;
+
+    const totalMatch = text.match(/(?:łącznie\s+zaproszeń|zaproszeń\s+łącznie|total\s+invites?)\s*:?\s*\*{0,2}(\d+)\*{0,2}/i);
+
+    return {
+      inviterId: inviterMatch[1],
+      total: totalMatch ? Number(totalMatch[1]) : null
+    };
+  }
+
+  async function importInviteMessage(message) {
+    if (!message || message.channelId !== LOG_CHANNEL_ID || !message.guildId) return false;
+
+    const parsed = parseInviteLogMessage(message);
+    if (!parsed) return false;
+
+    const result = store.importInviteLog({
+      guildId: message.guildId,
+      messageId: message.id,
+      inviterId: parsed.inviterId,
+      total: parsed.total
+    });
+
+    if (result.imported) {
+      const member = await message.guild.members.fetch(parsed.inviterId).catch(() => null);
+      await updateRewardRoles(member, result.total);
+      console.log(`✅ Zaimportowano zaproszenia ${parsed.inviterId}: ${result.total}`);
+    }
+
+    return result.imported;
+  }
+
+  async function scanInviteHistory() {
+    for (const guild of client.guilds.cache.values()) {
+      const channel = await guild.channels.fetch(LOG_CHANNEL_ID).catch(() => null);
+      if (!channel || !channel.isTextBased() || !channel.messages) {
+        console.log(`❌ Nie znaleziono kanału logów zaproszeń: ${LOG_CHANNEL_ID}`);
+        continue;
+      }
+
+      let before;
+      let scanned = 0;
+      let imported = 0;
+
+      while (true) {
+        const batch = await channel.messages.fetch({ limit: 100, ...(before ? { before } : {}) }).catch(error => {
+          console.log("❌ Błąd pobierania historii zaproszeń:", error.message || error);
+          return null;
+        });
+
+        if (!batch || batch.size === 0) break;
+        const ordered = [...batch.values()].sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+
+        for (const message of ordered) {
+          scanned += 1;
+          if (await importInviteMessage(message)) imported += 1;
+        }
+
+        before = batch.last().id;
+        if (batch.size < 100) break;
+      }
+
+      console.log(`✅ Historia zaproszeń: sprawdzono ${scanned}, dodano ${imported}.`);
+    }
+  }
+
+  // ==========================
   // READY
   // ==========================
   client.once(Events.ClientReady, async () => {
@@ -39,6 +124,7 @@ module.exports = (client) => {
       }
 
       console.log("✅ Invite system loaded");
+      await scanInviteHistory();
 
     } catch (err) {
 
@@ -176,6 +262,15 @@ module.exports = (client) => {
     } catch (err) {
 
       console.log("❌ Join Invite Error:", err);
+    }
+  });
+
+  // Zapisuj również nowe logi pojawiające się na kanale zaproszeń.
+  client.on(Events.MessageCreate, async message => {
+    try {
+      await importInviteMessage(message);
+    } catch (err) {
+      console.log("❌ Invite Log Import Error:", err);
     }
   });
 

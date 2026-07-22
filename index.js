@@ -121,6 +121,18 @@ client.once(
             PermissionFlagsBits.Administrator
           ),
 
+        new SlashCommandBuilder()
+
+          .setName("panelklienta")
+
+          .setDescription(
+            "Wyślij ponownie Panel Klienta"
+          )
+
+          .setDefaultMemberPermissions(
+            PermissionFlagsBits.Administrator
+          ),
+
         // =====================================
         // INVITES
         // =====================================
