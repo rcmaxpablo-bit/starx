@@ -120,28 +120,63 @@ module.exports = (client) => {
     await member.roles.add(CLIENT_ROLE_ID).catch(() => {});
   }
 
-  async function updateLegitCounterChannel(guild, count) {
-    if (!guild) return;
+  let legitRenameTimer = null;
+  let pendingLegitCount = null;
+
+  async function updateLegitCounterChannel(guild, count, attempt = 1) {
     const settings = store.read("settings");
     const prefix = "│✅・legit-check→";
-    const channelId = "1500893110048133253";
-    const channel = await guild.channels.fetch(channelId).catch(() => null);
+    const channelId = LEGIT_CHECK_CHANNEL_ID;
+    const safeCount = Math.max(0, Number(count) || 0);
 
     settings.legitCounterChannelId = channelId;
     settings.legitCounterChannelPrefix = prefix;
+    settings.legitCount = safeCount;
     store.write("settings", settings);
 
-    if (!channel?.setName) {
-      console.log("LEGIT COUNTER: nie znaleziono kanału 1500893110048133253.");
-      return;
+    // Pobieranie globalne działa także wtedy, gdy guild cache nie jest jeszcze gotowy.
+    let channel = await client.channels.fetch(channelId, { force: true }).catch(err => {
+      console.error(`LEGIT COUNTER FETCH ERROR (${channelId}):`, err?.message || err);
+      return null;
+    });
+    if (!channel && guild) {
+      channel = await guild.channels.fetch(channelId, { force: true }).catch(() => null);
     }
 
-    const newName = `${prefix}${count}`;
-    if (channel.name !== newName) {
-      await channel.setName(newName).catch(err =>
-        console.log("LEGIT COUNTER RENAME ERROR:", err.message)
-      );
+    if (!channel || typeof channel.setName !== 'function') {
+      console.error(`LEGIT COUNTER: kanał ${channelId} nie istnieje albo nie można zmienić jego nazwy.`);
+      return false;
     }
+
+    const newName = `${prefix}${safeCount}`;
+    if (channel.name === newName) {
+      console.log(`✅ LEGIT COUNTER bez zmian: ${newName}`);
+      return true;
+    }
+
+    try {
+      await channel.setName(newName, `Synchronizacja ${safeCount} wiadomości +rep`);
+      console.log(`✅ LEGIT COUNTER: ${channel.name} → ${newName}`);
+      return true;
+    } catch (err) {
+      console.error(`❌ LEGIT COUNTER RENAME ERROR (próba ${attempt}):`, err?.message || err);
+      if (attempt < 3) {
+        setTimeout(() => updateLegitCounterChannel(guild, safeCount, attempt + 1), attempt * 15000);
+      }
+      return false;
+    }
+  }
+
+  // Łączy wiele szybkich zmian w jedną zmianę nazwy kanału. Discord mocno
+  // ogranicza częstotliwość zmiany nazw kanałów.
+  function scheduleLegitCounterRename(guild, count) {
+    pendingLegitCount = Math.max(0, Number(count) || 0);
+    if (legitRenameTimer) clearTimeout(legitRenameTimer);
+    legitRenameTimer = setTimeout(async () => {
+      const value = pendingLegitCount;
+      legitRenameTimer = null;
+      await updateLegitCounterChannel(guild, value);
+    }, 1500);
   }
 
   function parseLegitMessage(content) {

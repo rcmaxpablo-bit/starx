@@ -66,3 +66,11 @@ Zrobione pod wygląd ze screenów, ale z brandingiem **🌟 StarX Exchange**.
 - Panel klienta na kanale `1529242794621665371`: statystyki, ostatnie 5 zakupów, zaproszenia, Top 5.
 - Zaproszenia są zapisywane po restarcie.
 - Brak systemu TX-ID i brak blokowania opinii.
+
+## Naprawa panelu i licznika LC
+- Panel Klienta obsługuje stare i nowe identyfikatory menu.
+- Menu natychmiast wykonuje prywatne `deferReply`, a następnie `editReply`.
+- Nowy panel używa `customer_panel_select_v3`.
+- Licznik LC pobiera kanał bezpośrednio po ID `1500893110048133253`.
+- Dodano logi pobierania/zmiany nazwy oraz automatyczne ponowienia.
+- Nazwa kanału ma format `│✅・legit-check→LICZBA`.
