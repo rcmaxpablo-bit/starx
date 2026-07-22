@@ -122,6 +122,8 @@ module.exports = (client) => {
 
   let legitRenameTimer = null;
   let pendingLegitCount = null;
+  let legitRenameRetryTimer = null;
+  let lastLegitChannelName = null;
 
   async function updateLegitCounterChannel(guild, count, attempt = 1) {
     const settings = store.read("settings");
@@ -155,14 +157,28 @@ module.exports = (client) => {
     }
 
     try {
+      const previousName = channel.name;
       await channel.setName(newName, `Synchronizacja ${safeCount} wiadomości +rep`);
-      console.log(`✅ LEGIT COUNTER: ${channel.name} → ${newName}`);
+      lastLegitChannelName = newName;
+      console.log(`✅ LEGIT COUNTER: ${previousName} → ${newName}`);
       return true;
     } catch (err) {
+      const retryAfterMs = Math.max(
+        15_000,
+        Number(err?.retry_after || err?.rawError?.retry_after || err?.data?.retry_after || 0) * 1000 || 0
+      );
       console.error(`❌ LEGIT COUNTER RENAME ERROR (próba ${attempt}):`, err?.message || err);
-      if (attempt < 3) {
-        setTimeout(() => updateLegitCounterChannel(guild, safeCount, attempt + 1), attempt * 15000);
-      }
+
+      // Discord ogranicza częstotliwość zmian nazwy kanału. Zachowujemy najnowszy
+      // wynik i ponawiamy zmianę po czasie wskazanym przez API (lub po 10 minutach).
+      pendingLegitCount = safeCount;
+      if (legitRenameRetryTimer) clearTimeout(legitRenameRetryTimer);
+      const delay = retryAfterMs > 15_000 ? retryAfterMs + 1000 : 10 * 60 * 1000;
+      legitRenameRetryTimer = setTimeout(() => {
+        legitRenameRetryTimer = null;
+        updateLegitCounterChannel(guild, pendingLegitCount, attempt + 1).catch(() => {});
+      }, delay);
+      console.log(`⏳ LEGIT COUNTER: ponowna próba za ${Math.ceil(delay / 1000)} s.`);
       return false;
     }
   }
@@ -807,7 +823,14 @@ module.exports = (client) => {
       // (inne message.id) jest osobną transakcją. Pierwsza może jedynie potwierdzić
       // oczekującą transakcję Green Markera, kolejne są dopisywane z treści LC.
       if (!confirmed) await importLegitMessageToCustomer(message, 'legit_live');
-      await syncLegitCounterFromHistory(message.guild);
+
+      // Każda osobna wiadomość +rep zwiększa licznik o 1 — także od tej samej
+      // osoby, bota lub webhooka. Nie skanujemy całej historii przy każdym wpisie.
+      const currentCount = Number(store.read("settings").legitCount || 0);
+      const nextCount = currentCount + 1;
+      store.setLegitCount(nextCount);
+      scheduleLegitCounterRename(message.guild, nextCount);
+      console.log(`✅ LEGIT +1: wiadomość ${message.id}, licznik ${nextCount}`);
 
       const ticketId = pendingLegitTickets.get(message.author.id);
       if (!ticketId) return;
@@ -837,12 +860,19 @@ module.exports = (client) => {
       if (message.channelId !== LEGIT_CHECK_CHANNEL_ID) return;
 
       const result = store.removeLegitTransactionByMessageId(message.id);
+      const wasRep = result.removed || String(message.content || '').trim().toLowerCase().startsWith('+rep');
       if (result.removed) {
         console.log(`LEGIT DELETE: usunięto transakcję dla wiadomości ${message.id}.`);
       }
 
-      const guild = message.guild || message.channel?.guild || client.guilds.cache.first();
-      await syncLegitCounterFromHistory(guild);
+      if (wasRep) {
+        const guild = message.guild || message.channel?.guild || client.guilds.cache.first();
+        const currentCount = Number(store.read("settings").legitCount || 0);
+        const nextCount = Math.max(0, currentCount - 1);
+        store.setLegitCount(nextCount);
+        scheduleLegitCounterRename(guild, nextCount);
+        console.log(`✅ LEGIT -1: wiadomość ${message.id}, licznik ${nextCount}`);
+      }
     } catch (err) {
       console.log('LEGIT DELETE ERROR:', err);
     }
@@ -858,8 +888,12 @@ module.exports = (client) => {
         newMessage = await newMessage.fetch().catch(() => newMessage);
       }
 
+      const oldWasRep = String(oldMessage.content || '').trim().toLowerCase().startsWith('+rep');
       const parsed = parseLegitMessage(newMessage.content);
-      if (!parsed) {
+      const newIsRep = Boolean(parsed);
+      const guild = newMessage.guild || newMessage.channel?.guild || client.guilds.cache.first();
+
+      if (!newIsRep) {
         store.removeLegitTransactionByMessageId(newMessage.id);
       } else {
         const updated = store.updateLegitTransactionByMessageId(newMessage.id, {
@@ -868,14 +902,17 @@ module.exports = (client) => {
           content: newMessage.content
         });
 
-        // Wiadomość mogła zostać edytowana zanim została zapisana lokalnie.
         if (!updated.updated) {
           await importLegitMessageToCustomer(newMessage, 'legit_update');
         }
       }
 
-      const guild = newMessage.guild || newMessage.channel?.guild || client.guilds.cache.first();
-      await syncLegitCounterFromHistory(guild);
+      if (oldWasRep !== newIsRep) {
+        const currentCount = Number(store.read("settings").legitCount || 0);
+        const nextCount = Math.max(0, currentCount + (newIsRep ? 1 : -1));
+        store.setLegitCount(nextCount);
+        scheduleLegitCounterRename(guild, nextCount);
+      }
     } catch (err) {
       console.log('LEGIT UPDATE ERROR:', err);
     }

@@ -1,798 +1,315 @@
-// =====================================
-// GIVEAWAY SYSTEM FINAL FIXED
-// =====================================
+const fs = require('fs');
+const path = require('path');
 
-const {
-    EmbedBuilder,
-    ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle,
-    Events,
-    PermissionFlagsBits
-} = require("discord.js");
+const DATA_DIR = path.join(__dirname, 'data');
+const FILES = {
+  customers: path.join(DATA_DIR, 'customers.json'),
+  transactions: path.join(DATA_DIR, 'transactions.json'),
+  invites: path.join(DATA_DIR, 'invites.json'),
+  settings: path.join(DATA_DIR, 'settings.json')
+};
 
-const fs = require("fs");
+const DEFAULTS = {
+  customers: {},
+  transactions: [],
+  invites: {},
+  settings: {
+    legitCount: 0,
+    legitCounterChannelId: '',
+    legitCounterChannelPrefix: '✅・legitcheck➜',
+    customerPanelChannelId: '1529242794621665371'
+  }
+};
 
-module.exports = (client) => {
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
 
-    // =====================================
-    // CONFIG
-    // =====================================
+function ensureDataFiles() {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  for (const [key, file] of Object.entries(FILES)) {
+    if (!fs.existsSync(file)) {
+      fs.writeFileSync(file, JSON.stringify(DEFAULTS[key], null, 2), 'utf8');
+    }
+  }
+}
 
-    const GIVEAWAY_CHANNEL_ID =
-        "1502022020487970948";
+function read(name) {
+  ensureDataFiles();
+  try {
+    return JSON.parse(fs.readFileSync(FILES[name], 'utf8'));
+  } catch (error) {
+    console.error(`DATA READ ERROR (${name}):`, error);
+    return clone(DEFAULTS[name]);
+  }
+}
 
-    const DATA_FILE =
-        "./giveaways.json";
+function write(name, value) {
+  ensureDataFiles();
+  const tmp = `${FILES[name]}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(value, null, 2), 'utf8');
+  fs.renameSync(tmp, FILES[name]);
+  return value;
+}
 
-    // =====================================
-    // EMOJI
-    // =====================================
+function getCustomer(userId) {
+  const customers = read('customers');
+  return customers[userId] || {
+    userId,
+    spent: 0,
+    transactions: 0,
+    firstPurchaseAt: null,
+    lastPurchaseAt: null
+  };
+}
 
-    const EMOJI = {
+function recordTransaction({ userId, amount, type, description, channelId, moderatorId, currency = 'PLN' }) {
+  const numericAmount = Number(amount) || 0;
+  const transactions = read('transactions');
+  const duplicate = transactions.find(tx => tx.channelId === channelId && tx.status === 'pending_rep');
+  if (duplicate) return { transaction: duplicate, created: false };
 
-        ticket:
-            "<:TICKET:1501697124734206032>",
+  const now = new Date().toISOString();
+  const transaction = {
+    userId,
+    amount: numericAmount,
+    currency,
+    type: type || 'transaction',
+    description: description || type || 'Transakcja',
+    channelId,
+    moderatorId,
+    createdAt: now,
+    status: 'pending_rep',
+    confirmedAt: null
+  };
+  transactions.push(transaction);
+  write('transactions', transactions);
 
-        pin:
-            "<:PIN:1501697389050986546>",
+  const customers = read('customers');
+  const customer = customers[userId] || {
+    userId,
+    spent: 0,
+    transactions: 0,
+    firstPurchaseAt: now,
+    lastPurchaseAt: now
+  };
+  customer.spent = Number(customer.spent || 0) + numericAmount;
+  customer.transactions = Number(customer.transactions || 0) + 1;
+  customer.firstPurchaseAt ||= now;
+  customer.lastPurchaseAt = now;
+  customers[userId] = customer;
+  write('customers', customers);
 
-        zap:
-            "<:PIORUN:1501697151737139350>",
+  return { transaction, created: true, customer };
+}
 
-        lock:
-            "<:ZAMKNIETE:1501697222901895258>",
+function importLegitTransaction({ messageId, userId, amount, description, channelId, createdAt, source = 'legit_history' }) {
+  if (!messageId || !userId) return { created: false, reason: 'missing_data' };
 
-        warning:
-            "<:PILNE:1501693444030992395>",
+  const transactions = read('transactions');
+  const duplicate = transactions.find(tx => tx.messageId === messageId);
+  if (duplicate) return { transaction: duplicate, created: false, reason: 'duplicate' };
 
-        admin:
-            "<:ADM:1501989271077388500>",
+  const numericAmount = Number(amount) || 0;
+  const timestamp = createdAt || new Date().toISOString();
+  const transaction = {
+    messageId,
+    userId,
+    amount: numericAmount,
+    currency: 'PLN',
+    type: 'legit_check',
+    description: description || 'Legit check',
+    channelId,
+    moderatorId: null,
+    createdAt: timestamp,
+    status: 'confirmed',
+    confirmedAt: timestamp,
+    source
+  };
 
-        clock:
-            "<:CZAS:1502030015943151868>",
+  transactions.push(transaction);
+  write('transactions', transactions);
 
-        arrow:
-            "<a:Arrow_White:1508094625984811038>",
+  const customers = read('customers');
+  const customer = customers[userId] || {
+    userId,
+    spent: 0,
+    transactions: 0,
+    firstPurchaseAt: timestamp,
+    lastPurchaseAt: timestamp
+  };
+  customer.spent = Number(customer.spent || 0) + numericAmount;
+  customer.transactions = Number(customer.transactions || 0) + 1;
+  if (!customer.firstPurchaseAt || new Date(timestamp) < new Date(customer.firstPurchaseAt)) {
+    customer.firstPurchaseAt = timestamp;
+  }
+  if (!customer.lastPurchaseAt || new Date(timestamp) > new Date(customer.lastPurchaseAt)) {
+    customer.lastPurchaseAt = timestamp;
+  }
+  customers[userId] = customer;
+  write('customers', customers);
 
-        nitro:
-            "<a:nitro:1501684762601848963>",
+  return { transaction, customer, created: true };
+}
 
-        confetti:
-            "<:confetti:1502025560606507048>",
+function confirmLatestPendingTransaction(userId, messageData = {}) {
+  const transactions = read('transactions');
 
-        green:
-            "<a:yes:1499784353012514917>",
+  // Każda wiadomość +rep ma własne messageId. Jeżeli była już zapisana,
+  // nie wolno naliczać jej drugi raz po restarcie ani ponownej synchronizacji.
+  if (messageData.messageId) {
+    const alreadyProcessed = transactions.find(tx => tx.messageId === messageData.messageId);
+    if (alreadyProcessed) return alreadyProcessed;
+  }
 
-        red:
-            "<a:no:1499784378992295956>"
+  for (let i = transactions.length - 1; i >= 0; i -= 1) {
+    const tx = transactions[i];
+    if (tx.userId === userId && tx.status === 'pending_rep') {
+      const confirmedAt = messageData.createdAt || new Date().toISOString();
+      tx.status = 'confirmed';
+      tx.confirmedAt = confirmedAt;
+      tx.messageId = messageData.messageId || tx.messageId || null;
+      tx.legitChannelId = messageData.channelId || tx.legitChannelId || null;
+      tx.legitContent = messageData.content || tx.legitContent || null;
+      tx.source = messageData.source || tx.source || 'legit_live';
+      write('transactions', transactions);
+      return tx;
+    }
+  }
+  return null;
+}
+
+function rebuildCustomersFromTransactions() {
+  const transactions = read('transactions');
+  const customers = {};
+
+  for (const tx of transactions) {
+    if (!tx?.userId) continue;
+    const timestamp = tx.confirmedAt || tx.createdAt || new Date().toISOString();
+    const customer = customers[tx.userId] || {
+      userId: tx.userId,
+      spent: 0,
+      transactions: 0,
+      firstPurchaseAt: timestamp,
+      lastPurchaseAt: timestamp
     };
 
-    // =====================================
-    // DATABASE
-    // =====================================
-
-    let giveaways = {};
-
-    function saveData() {
-
-        fs.writeFileSync(
-            DATA_FILE,
-            JSON.stringify(
-                giveaways,
-                null,
-                2
-            )
-        );
+    customer.spent = Number(customer.spent || 0) + (Number(tx.amount) || 0);
+    customer.transactions = Number(customer.transactions || 0) + 1;
+    if (!customer.firstPurchaseAt || new Date(timestamp) < new Date(customer.firstPurchaseAt)) {
+      customer.firstPurchaseAt = timestamp;
     }
-
-    function loadData() {
-
-        if (
-            !fs.existsSync(DATA_FILE)
-        ) {
-
-            fs.writeFileSync(
-                DATA_FILE,
-                "{}"
-            );
-        }
-
-        giveaways = JSON.parse(
-            fs.readFileSync(DATA_FILE)
-        );
+    if (!customer.lastPurchaseAt || new Date(timestamp) > new Date(customer.lastPurchaseAt)) {
+      customer.lastPurchaseAt = timestamp;
     }
-
-    loadData();
-
-    // =====================================
-    // READY
-    // =====================================
-
-    client.once(
-        Events.ClientReady,
-        async () => {
-
-            console.log(
-                "✅ Giveaway loaded"
-            );
-
-            startChecker();
-        }
-    );
-
-    // =====================================
-    // TIME PARSER
-    // =====================================
-
-    function parseTime(time) {
-
-        const value =
-            parseInt(time);
-
-        if (time.endsWith("m"))
-            return value * 60000;
-
-        if (time.endsWith("h"))
-            return value * 3600000;
-
-        if (time.endsWith("d"))
-            return value * 86400000;
-
-        return null;
-    }
-
-    // =====================================
-    // UPDATE EMBED
-    // =====================================
-
-    async function updateGiveawayMessage(id) {
-
-        const g =
-            giveaways[id];
-
-        if (!g) return;
-
-        const channel =
-            await client.channels.fetch(
-                g.channelId
-            ).catch(() => null);
-
-        if (!channel) return;
-
-        const msg =
-            await channel.messages.fetch(
-                g.messageId
-            ).catch(() => null);
-
-        if (!msg) return;
-
-        const embed =
-            new EmbedBuilder()
-
-                .setColor(
-                    "#0f1014"
-                )
-
-                .setTitle(
-                    `${EMOJI.nitro} PREMIUM GIVEAWAY`
-                )
-
-                .setDescription(
-`${EMOJI.pin} **Nagroda**
-> ${g.reward}
-
-${EMOJI.admin} **Winnerzy**
-> ${g.winners}
-
-${EMOJI.clock} **Koniec**
-> <t:${Math.floor(g.endAt / 1000)}:R>
-
-${EMOJI.lock} **Rola**
-> ${g.roleId ? `<@&${g.roleId}>` : "Brak"}
-
-${EMOJI.zap} **Bonus Entries**
-> +${g.bonus}
-
-${EMOJI.ticket} **Uczestnicy**
-> ${g.entries.length}
-
-━━━━━━━━━━━━━━━━━━━━━━━
-
-${EMOJI.arrow} Kliknij przycisk poniżej aby dołączyć.
-`
-                )
-
-                .setImage(
-                    "https://i.imgur.com/QYhsGEm_d.webp?maxwidth=760&fidelity=grand"
-                )
-
-                .setFooter({
-
-                    text:
-                        `Giveaway ID: ${id}`
-                });
-
-        const row =
-            new ActionRowBuilder()
-
-                .addComponents(
-
-                    new ButtonBuilder()
-
-                        .setCustomId(
-                            `join_${id}`
-                        )
-
-                        .setLabel(
-                            "DOŁĄCZ"
-                        )
-
-                        .setEmoji("🎉")
-
-                        .setStyle(
-                            ButtonStyle.Success
-                        )
-                );
-
-        await msg.edit({
-
-            embeds: [embed],
-            components: [row]
-        });
-    }
-
-    // =====================================
-    // AUTO END
-    // =====================================
-
-    function startChecker() {
-
-        setInterval(async () => {
-
-            for (const id in giveaways) {
-
-                const g =
-                    giveaways[id];
-
-                if (g.ended)
-                    continue;
-
-                if (
-                    Date.now() >=
-                    g.endAt
-                ) {
-
-                    await endGiveaway(id);
-                }
-            }
-
-        }, 5000);
-    }
-
-    // =====================================
-    // END GIVEAWAY
-    // =====================================
-
-    async function endGiveaway(id) {
-
-        const g =
-            giveaways[id];
-
-        if (!g) return;
-
-        g.ended = true;
-
-        saveData();
-
-        const channel =
-            await client.channels.fetch(
-                g.channelId
-            ).catch(() => null);
-
-        if (!channel) return;
-
-        const msg =
-            await channel.messages.fetch(
-                g.messageId
-            ).catch(() => null);
-
-        if (!msg) return;
-
-        let users = [];
-
-        for (const userId of g.entries) {
-
-            users.push(userId);
-
-            for (
-                let i = 0;
-                i < g.bonus;
-                i++
-            ) {
-
-                users.push(userId);
-            }
-        }
-
-        if (!users.length) {
-
-            return channel.send({
-
-                content:
-                    `${EMOJI.red} Brak uczestników`
-            });
-        }
-
-        const winners = [];
-
-        while (
-            winners.length <
-            g.winners &&
-            users.length > 0
-        ) {
-
-            const random =
-                users[
-                    Math.floor(
-                        Math.random() *
-                        users.length
-                    )
-                ];
-
-            if (
-                !winners.includes(
-                    random
-                )
-            ) {
-
-                winners.push(random);
-            }
-
-            users =
-                users.filter(
-                    x => x !== random
-                );
-        }
-
-        const embed =
-            new EmbedBuilder()
-
-                .setColor('#1b2dff')
-
-                .setTitle(
-                    `${EMOJI.confetti} GIVEAWAY ZAKOŃCZONY`
-                )
-
-                .setDescription(
-`${EMOJI.pin} **Nagroda**
-> ${g.reward}
-
-${EMOJI.admin} **Winnerzy**
-> ${winners.map(x => `<@${x}>`).join(", ")}
-
-${EMOJI.ticket} **Uczestnicy**
-> ${g.entries.length}
-
-${EMOJI.clock} **Koniec**
-> <t:${Math.floor(Date.now() / 1000)}:R>
-
-${EMOJI.ticket} **ID**
-> \`${id}\`
-`
-                )
-
-                .setImage(
-                    "https://i.imgur.com/QYhsGEm_d.webp?maxwidth=760&fidelity=grand"
-                );
-
-        const row =
-            new ActionRowBuilder()
-
-                .addComponents(
-
-                    new ButtonBuilder()
-
-                        .setCustomId(
-                            `reroll_${id}`
-                        )
-
-                        .setLabel(
-                            "REROLL"
-                        )
-
-                        .setEmoji("🔄")
-
-                        .setStyle(
-                            ButtonStyle.Secondary
-                        )
-                );
-
-        await msg.edit({
-
-            embeds: [embed],
-            components: [row]
-        });
-
-        await channel.send({
-
-            content:
-                `${EMOJI.confetti} Gratulacje ${winners.map(x => `<@${x}>`).join(", ")}`
-        });
-    }
-
-    // =====================================
-    // INTERACTIONS
-    // =====================================
-
-    client.on(
-        Events.InteractionCreate,
-        async interaction => {
-
-            // =====================================
-            // CREATE GIVEAWAY
-            // =====================================
-
-            if (
-                interaction.isChatInputCommand() &&
-                interaction.commandName ===
-                    "giveaway"
-            ) {
-
-                const reward =
-                    interaction.options.getString(
-                        "nagroda"
-                    );
-
-                const time =
-                    interaction.options.getString(
-                        "czas"
-                    );
-
-                const winners =
-                    interaction.options.getInteger(
-                        "winnerzy"
-                    );
-
-                const role =
-                    interaction.options.getRole(
-                        "rola"
-                    );
-
-                const bonus =
-                    interaction.options.getInteger(
-                        "bonus"
-                    ) || 0;
-
-                const ms =
-                    parseTime(time);
-
-                if (!ms) {
-
-                    return interaction.reply({
-
-                        content:
-                            `${EMOJI.red} Zły format czasu`,
-
-                        ephemeral: true
-                    });
-                }
-
-                const id =
-                    Date.now().toString();
-
-                const endAt =
-                    Date.now() + ms;
-
-                const channel =
-                    await client.channels.fetch(
-                        GIVEAWAY_CHANNEL_ID
-                    );
-
-                const msg =
-                    await channel.send({
-
-                        content:
-                            `${EMOJI.confetti} Tworzenie giveaway...`
-                    });
-
-                giveaways[id] = {
-
-                    reward,
-                    winners,
-
-                    roleId:
-                        role
-                            ? role.id
-                            : null,
-
-                    bonus,
-
-                    entries: [],
-
-                    messageId:
-                        msg.id,
-
-                    channelId:
-                        channel.id,
-
-                    endAt,
-
-                    ended: false
-                };
-
-                saveData();
-
-                await updateGiveawayMessage(id);
-
-                return interaction.reply({
-
-                    content:
-                        `${EMOJI.green} Giveaway utworzony`,
-
-                    ephemeral: true
-                });
-            }
-
-            // =====================================
-            // JOIN BUTTON
-            // =====================================
-
-            if (
-                interaction.isButton() &&
-                interaction.customId.startsWith(
-                    "join_"
-                )
-            ) {
-
-                const id =
-                    interaction.customId.split("_")[1];
-
-                const g =
-                    giveaways[id];
-
-                if (!g) return;
-
-                if (g.ended) {
-
-                    return interaction.reply({
-
-                        content:
-                            `${EMOJI.red} Giveaway zakończony`,
-
-                        ephemeral: true
-                    });
-                }
-
-                if (
-                    g.roleId &&
-                    !interaction.member.roles.cache.has(
-                        g.roleId
-                    )
-                ) {
-
-                    return interaction.reply({
-
-                        content:
-                            `${EMOJI.red} Nie posiadasz wymaganej roli`,
-
-                        ephemeral: true
-                    });
-                }
-
-                if (
-                    g.entries.includes(
-                        interaction.user.id
-                    )
-                ) {
-
-                    return interaction.reply({
-
-                        content:
-                            `${EMOJI.warning} Już bierzesz udział`,
-
-                        ephemeral: true
-                    });
-                }
-
-                g.entries.push(
-                    interaction.user.id
-                );
-
-                saveData();
-
-                await updateGiveawayMessage(id);
-
-                return interaction.reply({
-
-                    content:
-                        `${EMOJI.green} Dołączono do giveaway`,
-
-                    ephemeral: true
-                });
-            }
-
-
-            // =====================================
-            // UCZESTNICY GIVEAWAY
-            // =====================================
-
-            if (
-                interaction.isChatInputCommand() &&
-                interaction.commandName ===
-                    "uczestnicy"
-            ) {
-
-                if (
-                    !interaction.member.permissions.has(
-                        PermissionFlagsBits.Administrator
-                    )
-                ) {
-
-                    return interaction.reply({
-
-                        content:
-                            `${EMOJI.red} Brak permisji`,
-
-                        ephemeral: true
-                    });
-                }
-
-                const id =
-                    interaction.options.getString(
-                        "id"
-                    );
-
-                const g =
-                    giveaways[id];
-
-                if (!g) {
-
-                    return interaction.reply({
-
-                        content:
-                            `${EMOJI.red} Nie znaleziono giveaway o ID: \`${id}\``,
-
-                        ephemeral: true
-                    });
-                }
-
-                const uniqueEntries =
-                    [...new Set(g.entries)];
-
-                const list =
-                    uniqueEntries.length
-                        ? uniqueEntries.map((userId, index) => `${index + 1}. <@${userId}> \`${userId}\``).join("\\n")
-                        : "Brak uczestników";
-
-                const chunks = [];
-                let current = "";
-
-                for (const line of list.split("\\n")) {
-                    if ((current + "\\n" + line).length > 3500) {
-                        chunks.push(current);
-                        current = line;
-                    } else {
-                        current += current ? "\\n" + line : line;
-                    }
-                }
-
-                if (current) chunks.push(current);
-
-                const embed =
-                    new EmbedBuilder()
-                        .setColor("#1b2dff")
-                        .setTitle(`${EMOJI.ticket} UCZESTNICY GIVEAWAY`)
-                        .setDescription(
-`${EMOJI.pin} **Nagroda**
-> ${g.reward}
-
-${EMOJI.ticket} **ID**
-> \`${id}\`
-
-${EMOJI.zap} **Liczba uczestników**
-> ${uniqueEntries.length}
-
-${EMOJI.arrow} **Lista**
-${chunks[0] || "Brak uczestników"}`
-                        )
-                        .setFooter({
-                            text:
-                                "© 2026 StarX Exchange x Giveaway"
-                        });
-
-                await interaction.reply({
-                    embeds: [embed],
-                    ephemeral: true
-                });
-
-                for (let i = 1; i < chunks.length; i++) {
-                    await interaction.followUp({
-                        content: chunks[i],
-                        ephemeral: true
-                    });
-                }
-
-                return;
-            }
-
-            // =====================================
-            // REROLL BUTTON
-            // =====================================
-
-            if (
-                interaction.isButton() &&
-                interaction.customId.startsWith(
-                    "reroll_"
-                )
-            ) {
-
-                if (
-                    !interaction.member.permissions.has(
-                        PermissionFlagsBits.Administrator
-                    )
-                ) {
-
-                    return interaction.reply({
-
-                        content:
-                            `${EMOJI.red} Brak permisji`,
-
-                        ephemeral: true
-                    });
-                }
-
-                const id =
-                    interaction.customId.split("_")[1];
-
-                const g =
-                    giveaways[id];
-
-                if (!g) return;
-
-                if (
-                    !g.entries.length
-                ) {
-
-                    return interaction.reply({
-
-                        content:
-                            `${EMOJI.red} Brak uczestników`,
-
-                        ephemeral: true
-                    });
-                }
-
-                let users = [];
-
-                for (const userId of g.entries) {
-
-                    users.push(userId);
-
-                    for (
-                        let i = 0;
-                        i < g.bonus;
-                        i++
-                    ) {
-
-                        users.push(userId);
-                    }
-                }
-
-                const winner =
-                    users[
-                        Math.floor(
-                            Math.random() *
-                            users.length
-                        )
-                    ];
-
-                return interaction.reply({
-
-                    content:
-                        `🔄 Nowy winner: <@${winner}>`
-                });
-            }
-        }
-    );
+    customers[tx.userId] = customer;
+  }
+
+  write('customers', customers);
+  return customers;
+}
+
+function removeLegitTransactionByMessageId(messageId) {
+  if (!messageId) return { removed: false, reason: 'missing_message_id' };
+
+  const transactions = read('transactions');
+  const index = transactions.findIndex(tx => tx.messageId === messageId);
+  if (index === -1) return { removed: false, reason: 'not_found' };
+
+  const [transaction] = transactions.splice(index, 1);
+  write('transactions', transactions);
+  rebuildCustomersFromTransactions();
+  return { removed: true, transaction };
+}
+
+function updateLegitTransactionByMessageId(messageId, changes = {}) {
+  if (!messageId) return { updated: false, reason: 'missing_message_id' };
+  const transactions = read('transactions');
+  const transaction = transactions.find(tx => tx.messageId === messageId);
+  if (!transaction) return { updated: false, reason: 'not_found' };
+
+  if (changes.amount !== undefined) transaction.amount = Number(changes.amount) || 0;
+  if (changes.description !== undefined) transaction.description = changes.description || 'Legit check';
+  if (changes.content !== undefined) transaction.legitContent = changes.content;
+  transaction.updatedAt = new Date().toISOString();
+
+  write('transactions', transactions);
+  rebuildCustomersFromTransactions();
+  return { updated: true, transaction };
+}
+
+function setLegitCount(value) {
+  const settings = read('settings');
+  settings.legitCount = Math.max(0, Number(value) || 0);
+  write('settings', settings);
+  return settings.legitCount;
+}
+
+function incrementLegitCount() {
+  const settings = read('settings');
+  return setLegitCount(Number(settings.legitCount || 0) + 1);
+}
+
+function getInviteCount(guildId, userId) {
+  const invites = read('invites');
+  return Number(invites?.[guildId]?.[userId] || 0);
+}
+
+function setInviteCount(guildId, userId, value) {
+  const invites = read('invites');
+  invites[guildId] ||= {};
+  invites[guildId][userId] = Math.max(0, Number(value) || 0);
+  write('invites', invites);
+  return invites[guildId][userId];
+}
+
+function addInviteCount(guildId, userId, amount = 1) {
+  return setInviteCount(guildId, userId, getInviteCount(guildId, userId) + Number(amount || 0));
+}
+
+function importInviteLog({ guildId, messageId, inviterId, total = null }) {
+  if (!guildId || !messageId || !inviterId) {
+    return { imported: false, reason: 'missing_data' };
+  }
+
+  const invites = read('invites');
+  invites[guildId] ||= {};
+  invites._importedMessages ||= {};
+
+  if (invites._importedMessages[messageId]) {
+    return { imported: false, reason: 'duplicate', total: getInviteCount(guildId, inviterId) };
+  }
+
+  const current = Number(invites[guildId][inviterId] || 0);
+  const parsedTotal = total === null || total === undefined ? null : Math.max(0, Number(total) || 0);
+  const next = parsedTotal === null ? current + 1 : Math.max(current, parsedTotal);
+
+  invites[guildId][inviterId] = next;
+  invites._importedMessages[messageId] = {
+    guildId,
+    inviterId,
+    importedAt: new Date().toISOString()
+  };
+  write('invites', invites);
+
+  return { imported: true, total: next };
+}
+
+module.exports = {
+  ensureDataFiles,
+  read,
+  write,
+  getCustomer,
+  recordTransaction,
+  importLegitTransaction,
+  confirmLatestPendingTransaction,
+  rebuildCustomersFromTransactions,
+  removeLegitTransactionByMessageId,
+  updateLegitTransactionByMessageId,
+  setLegitCount,
+  incrementLegitCount,
+  getInviteCount,
+  setInviteCount,
+  addInviteCount,
+  importInviteLog
 };

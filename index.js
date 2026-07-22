@@ -76,7 +76,8 @@ const modules = [
   "./lc",
   "./giveaway",
   "./przejmij",
-  "./customerPanel"
+  "./customerPanel",
+  "./legitCheckPanel"
 ];
 
 for (const mod of modules) {
