@@ -654,7 +654,7 @@ module.exports = (client) => {
   function exchangeChoiceRows(selection = {}) {
     const methods = [
       ["BLIK", EMOJI.blik], ["KODBLIK", EMOJI.kodblik], ["PAYPAL", EMOJI.paypal],
-      ["LTC", EMOJI.ltc], ["BTC", "₿"], ["ETH", "◆"], ["SOL", "◎"],
+      ["LTC", EMOJI.ltc], ["BTC", "🟠"], ["ETH", "🔷"], ["SOL", "🟣"],
       ["USDT", "💵"], ["CRYPTO", EMOJI.crypto], ["PSC", EMOJI.psc], ["SKRILL", EMOJI.skrill]
     ];
     const currencies = [["PLN", "🇵🇱"], ["EUR", "🇪🇺"], ["USD", "🇺🇸"]];
