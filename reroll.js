@@ -18,9 +18,7 @@ module.exports = (client) => {
     const giveaways = global.giveaways || new Map();
     global.giveaways = giveaways;
 
-    // =========================
     // REGISTER COMMAND
-    // =========================
     client.once(Events.ClientReady, async () => {
 
         const commands = [
@@ -40,9 +38,7 @@ module.exports = (client) => {
         console.log("✅ Reroll loaded");
     });
 
-    // =========================
     // COMMAND LOGIC
-    // =========================
     client.on(Events.InteractionCreate, async (interaction) => {
 
         if (!interaction.isChatInputCommand()) return;
