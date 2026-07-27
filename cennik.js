@@ -1,45 +1,61 @@
+const {
+  Events,
+  PermissionFlagsBits,
+  MessageFlags
+} = require('discord.js');
 
-const { Events, PermissionFlagsBits } = require("discord.js");
-
-module.exports = (client) => {
+module.exports = client => {
   client.on(Events.InteractionCreate, async interaction => {
-    if (!interaction.isChatInputCommand()) return;
-    if (interaction.commandName !== "autolc") return;
-
-    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
-      return interaction.reply({
-        content: "❌ Brak permisji.",
-        ephemeral: true
-      });
+    if (!interaction.isChatInputCommand() || interaction.commandName !== 'autolc') {
+      return;
     }
 
-    const user = interaction.options.getUser("uzytkownik");
-    const text = interaction.options.getString("tekst");
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+      return interaction.reply({
+        content: '❌ Brak uprawnień administratora.',
+        flags: MessageFlags.Ephemeral
+      }).catch(() => {});
+    }
+
+    const user = interaction.options.getUser('uzytkownik', true);
+    const text = interaction.options.getString('tekst', true);
 
     try {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+      if (!interaction.channel?.isTextBased?.() || typeof interaction.channel.createWebhook !== 'function') {
+        throw new Error('Na tym kanale nie można utworzyć webhooka.');
+      }
+
       const webhook = await interaction.channel.createWebhook({
         name: `${user.username} [ Automatyczne LC ]`,
-        avatar: user.displayAvatarURL()
+        avatar: user.displayAvatarURL({ extension: 'png', size: 256 })
       });
 
-      await webhook.send({
-        content: text
-      });
+      try {
+        await webhook.send({ content: text });
+      } finally {
+        await webhook.delete('Usunięcie tymczasowego webhooka AutoLC').catch(() => {});
+      }
 
-      setTimeout(() => {
-        webhook.delete().catch(() => {});
-      }, 5000);
+      return interaction.editReply({
+        content: '✅ Automatyczne LC zostało wysłane.'
+      });
+    } catch (error) {
+      console.error('❌ AUTOLC:', error?.stack || error);
 
-      await interaction.reply({
-        content: "✅ Automatyczne LC wysłane.",
-        ephemeral: true
-      });
-    } catch (err) {
-      console.log(err);
-      await interaction.reply({
-        content: "❌ Błąd podczas wysyłania LC.",
-        ephemeral: true
-      });
+      const payload = {
+        content: `❌ Nie udało się wysłać automatycznego LC: ${String(error?.message || error).slice(0, 300)}`
+      };
+
+      if (interaction.deferred || interaction.replied) {
+        return interaction.editReply(payload).catch(() => {});
+      }
+
+      return interaction.reply({
+        ...payload,
+        flags: MessageFlags.Ephemeral
+      }).catch(() => {});
     }
   });
 };
