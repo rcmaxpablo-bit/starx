@@ -1,4 +1,3 @@
-
 const { Events, PermissionFlagsBits } = require("discord.js");
 
 module.exports = (client) => {
@@ -22,9 +21,7 @@ module.exports = (client) => {
         avatar: user.displayAvatarURL()
       });
 
-      await webhook.send({
-        content: text
-      });
+      await webhook.send({ content: text });
 
       setTimeout(() => {
         webhook.delete().catch(() => {});
@@ -35,11 +32,17 @@ module.exports = (client) => {
         ephemeral: true
       });
     } catch (err) {
-      console.log(err);
-      await interaction.reply({
+      console.error("AUTOLC ERROR:", err?.stack || err);
+      const payload = {
         content: "❌ Błąd podczas wysyłania LC.",
         ephemeral: true
-      });
+      };
+
+      if (interaction.deferred || interaction.replied) {
+        await interaction.followUp(payload).catch(() => {});
+      } else {
+        await interaction.reply(payload).catch(() => {});
+      }
     }
   });
 };
