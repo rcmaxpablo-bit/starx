@@ -81,7 +81,7 @@ test("menu wymiany otwiera formularz z listami wyboru", async () => {
     assert.ok(component.component.options.length >= 3);
   }
 
-  const expectedMethods = ["BLIK", "KODBLIK", "PSC", "PAYPAL", "CRYPTO", "SKRILL"];
+  const expectedMethods = ["BLIK", "KODBLIK", "LTC", "PSC", "PAYPAL", "CRYPTO", "SKRILL"];
   assert.deepEqual(from.component.options.map(option => option.value), expectedMethods);
   assert.deepEqual(to.component.options.map(option => option.value), expectedMethods);
 
@@ -170,7 +170,7 @@ test("ustawienia ticketa używają list wyboru metod", async () => {
   assert.equal(from.component.type, ComponentType.StringSelect);
   assert.equal(to.component.type, ComponentType.StringSelect);
 
-  const settingsMethods = ["BLIK", "KODBLIK", "PSC", "PAYPAL", "CRYPTO", "LTC", "SKRILL"];
+  const settingsMethods = ["BLIK", "KODBLIK", "LTC", "PSC", "PAYPAL", "CRYPTO", "SKRILL"];
   assert.deepEqual(from.component.options.map(option => option.value), settingsMethods);
   assert.deepEqual(to.component.options.map(option => option.value), settingsMethods);
   assert.equal(to.component.options.find(option => option.value === "LTC").default, true);
@@ -206,6 +206,6 @@ test("formularz zakupu ma listę wyboru metody płatności", async () => {
   assert.equal(method.component.custom_id, "purchase_method");
   assert.deepEqual(
     method.component.options.map(option => option.value),
-    ["BLIK", "KODBLIK", "PSC", "PAYPAL", "CRYPTO", "SKRILL"]
+    ["BLIK", "KODBLIK", "LTC", "PSC", "PAYPAL", "CRYPTO", "SKRILL"]
   );
 });

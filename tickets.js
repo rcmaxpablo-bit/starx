@@ -54,6 +54,7 @@ module.exports = (client) => {
   const AVAILABLE_METHODS = Object.freeze([
     "BLIK",
     "KODBLIK",
+    "LTC",
     "PSC",
     "PAYPAL",
     "CRYPTO",
@@ -64,10 +65,10 @@ module.exports = (client) => {
   const SETTINGS_METHODS = Object.freeze([
     "BLIK",
     "KODBLIK",
+    "LTC",
     "PSC",
     "PAYPAL",
     "CRYPTO",
-    "LTC",
     "SKRILL"
   ]);
 
