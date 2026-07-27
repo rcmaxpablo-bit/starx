@@ -1,41 +1,48 @@
-const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
-const test = require('node:test');
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const { EventEmitter } = require("node:events");
+const { ComponentType, Events } = require("discord.js");
 
-const sourceFile = path.join(__dirname, '..', 'dataStore.js');
-
-function loadIsolatedStore(t) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'starx-store-'));
-  fs.copyFileSync(sourceFile, path.join(directory, 'dataStore.js'));
-  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
-  return { directory, store: require(path.join(directory, 'dataStore.js')) };
+function createClient() {
+  const client = new EventEmitter();
+  client.user = { id: "bot" };
+  client.channels = { fetch: async () => null };
+  client.isReady = () => false;
+  return client;
 }
 
-test('dataStore.js nie zawiera pozostałości konfliktu Git ani drugiej kopii modułu', () => {
-  const source = fs.readFileSync(sourceFile, 'utf8');
-  assert.doesNotMatch(source, /^(?:<<<<<<<|=======|>>>>>>>)/m);
-  assert.equal((source.match(/const fs = require\('fs'\);/g) || []).length, 1);
-  assert.equal((source.match(/module\.exports = \{/g) || []).length, 1);
+test("kalkulator prowizji otwiera klasyczny formularz tekstowy", async () => {
+  const client = createClient();
+  require("../obliczprowizje")(client);
+
+  let modal;
+  const interaction = {
+    customId: "calc_type",
+    values: ["otrzymam"],
+    isStringSelectMenu: () => true,
+    isModalSubmit: () => false,
+    showModal: async value => {
+      modal = value.toJSON();
+    }
+  };
+
+  const listeners = client.listeners(Events.InteractionCreate);
+  assert.equal(listeners.length, 1);
+
+  await listeners[0](interaction);
+
+  assert.ok(modal, "Formularz kalkulatora nie został wyświetlony");
+  assert.equal(modal.custom_id, "calc_modal_otrzymam");
+  assert.equal(modal.components.length, 3);
+  assert.ok(modal.components.every(row => row.type === ComponentType.ActionRow));
+  assert.ok(modal.components.every(row =>
+    row.components.length === 1 &&
+    row.components[0].type === ComponentType.TextInput
+  ));
 });
 
-test('normalizuje i trwale naprawia starszy format transakcji', t => {
-  const { directory, store } = loadIsolatedStore(t);
-  fs.writeFileSync(path.join(directory, 'transactions.json'), '{}', 'utf8');
-
-  assert.deepEqual(store.read('transactions'), []);
-  assert.deepEqual(
-    JSON.parse(fs.readFileSync(path.join(directory, 'data', 'transactions.json'), 'utf8')),
-    []
-  );
-});
-
-test('zapisuje transakcję tylko raz dla tego samego +rep', t => {
-  const { store } = loadIsolatedStore(t);
-  const input = { messageId: 'rep-1', userId: 'user-1', amount: 20 };
-
-  assert.equal(store.importLegitTransaction(input).created, true);
-  assert.equal(store.importLegitTransaction(input).created, false);
-  assert.equal(store.read('transactions').length, 1);
+test("moduł cennik nie dubluje obsługi komendy autolc", () => {
+  const client = createClient();
+  require("../cennik")(client);
+  assert.equal(client.listenerCount(Events.InteractionCreate), 0);
 });

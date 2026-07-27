@@ -9,8 +9,7 @@ const {
   ButtonStyle,
   ModalBuilder,
   TextInputBuilder,
-  TextInputStyle,
-  StringSelectMenuOptionBuilder
+  TextInputStyle
 } = require("discord.js");
 const { upsertPanel } = require("./panelManager");
 const store = require("./dataStore");
@@ -59,7 +58,6 @@ module.exports = (client) => {
   const pendingLegitTickets = new Map(); // clientId -> ticketChannelId
   const pendingPaymentData = new Map(); // channelId:userId -> dane z /dane
   const autoLegitSent = new Set(); // channelId - ochrona przed podwójnym wysłaniem
-  const pendingExchanges = new Map();
 
   function getUserStats(userId) {
     if (!userStats.has(userId)) userStats.set(userId, { exchanges: 8, total: 369 });
@@ -636,39 +634,45 @@ module.exports = (client) => {
     };
   }
 
-  function createExchangeAmountModal() {
-    const modal = new ModalBuilder()
-      .setCustomId("exchange_amount_modal")
-      .setTitle("Kwota wymiany");
-
-    const amountInput = new TextInputBuilder()
-      .setCustomId("exchange_amount")
-      .setLabel("JAKA KWOTA")
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder("Np. 48")
-      .setRequired(true);
-
-    return modal.addComponents(new ActionRowBuilder().addComponents(amountInput));
-  }
-
-  function exchangeChoiceRows(selection = {}) {
-    const methods = [
-      ["BLIK", EMOJI.blik], ["KODBLIK", EMOJI.kodblik], ["PAYPAL", EMOJI.paypal],
-      ["LTC", EMOJI.ltc], ["BTC", "🟠"], ["ETH", "🔷"], ["SOL", "🟣"],
-      ["USDT", "💵"], ["CRYPTO", EMOJI.crypto], ["PSC", EMOJI.psc], ["SKRILL", EMOJI.skrill]
-    ];
-    const currencies = [["PLN", "🇵🇱"], ["EUR", "🇪🇺"], ["USD", "🇺🇸"]];
-    const menu = (id, placeholder, values, selected) => new StringSelectMenuBuilder()
-      .setCustomId(id).setPlaceholder(selected || placeholder).addOptions(values.map(([value, emoji]) => {
-        const option = new StringSelectMenuOptionBuilder().setLabel(value).setValue(value).setEmoji(emoji);
-        if (value === selected) option.setDefault(true);
-        return option;
-      }));
-    return [
-      new ActionRowBuilder().addComponents(menu("exchange_from_select", "Z czego?", methods, selection.from)),
-      new ActionRowBuilder().addComponents(menu("exchange_to_select", "Na co?", methods, selection.to)),
-      new ActionRowBuilder().addComponents(menu("exchange_currency_select", "Waluta", currencies, selection.currency))
-    ];
+  function createExchangeModal() {
+    return new ModalBuilder()
+      .setCustomId("exchange_full_modal")
+      .setTitle("Formularz wymiany")
+      .addComponents(
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId("exchange_amount")
+            .setLabel("JAKA KWOTA")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("Np. 48")
+            .setRequired(true)
+        ),
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId("exchange_from")
+            .setLabel("Z CZEGO")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("BLIK / KOD BLIK / PAYPAL / LTC / BTC / ETH / SOL")
+            .setRequired(true)
+        ),
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId("exchange_to")
+            .setLabel("NA CO")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("BLIK / KOD BLIK / PAYPAL / LTC / BTC / ETH / SOL")
+            .setRequired(true)
+        ),
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId("exchange_currency")
+            .setLabel("WALUTA (PLN / EUR / USD)")
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder("PLN")
+            .setValue("PLN")
+            .setRequired(true)
+        )
+      );
   }
 
   function isCryptoMethod(value) {
@@ -684,8 +688,10 @@ module.exports = (client) => {
     const numericAmount = Number(String(amount).replace(",", "."));
     const percent = rates[`${rateMethod(from)}->${rateMethod(to)}`];
     if (!Number.isFinite(numericAmount) || numericAmount <= 0 || !Number.isFinite(percent)) return null;
+    if (normalizeExchangeMethod(from) === normalizeExchangeMethod(to)) return null;
     const percentageFee = (numericAmount * percent) / 100;
     const fee = Math.max(percentageFee, 3);
+    if (numericAmount <= fee) return null;
     // Zgodnie z wymaganiem zawsze obcinamy do pełnych 10 groszy w dół.
     const afterFee = Math.floor((numericAmount - fee) * 10) / 10;
     return {
@@ -864,20 +870,6 @@ module.exports = (client) => {
     try {
 
     // =========================
-    // WYBÓR DANYCH WYMIANY
-    // =========================
-    if (interaction.isStringSelectMenu() && interaction.customId.endsWith("_select") && interaction.customId.startsWith("exchange_")) {
-      const selection = pendingExchanges.get(interaction.user.id) || {};
-      const key = { exchange_from_select: "from", exchange_to_select: "to", exchange_currency_select: "currency" }[interaction.customId];
-      selection[key] = interaction.values[0];
-      pendingExchanges.set(interaction.user.id, selection);
-      if (selection.from && selection.to && selection.currency) {
-        return interaction.showModal(createExchangeAmountModal());
-      }
-      return interaction.update({ components: exchangeChoiceRows(selection) });
-    }
-
-    // =========================
     // MENU
     // =========================
     if (
@@ -887,12 +879,19 @@ module.exports = (client) => {
 
       const type = interaction.values[0];
 
+      if (!interaction.guild) {
+        return interaction.reply({
+          content: `${EMOJI.warning} Wystąpił błąd: tickety można tworzyć wyłącznie na serwerze.`,
+          ephemeral: true
+        });
+      }
+
       // =====================================
       // CHECK EXISTING TICKET
       // =====================================
       const existing =
         interaction.guild.channels.cache.find(c =>
-          c.topic?.startsWith(interaction.user.id)
+          c.topic?.startsWith(`${interaction.user.id}:`)
         );
 
       if (existing)
@@ -905,12 +904,7 @@ module.exports = (client) => {
       // EXCHANGE
       // =====================================
       if (type === "exchange") {
-        pendingExchanges.set(interaction.user.id, {});
-        return interaction.reply({
-          content: `${EMOJI.money} Wybierz metody wymiany i walutę:`,
-          components: exchangeChoiceRows(),
-          ephemeral: true
-        });
+        return interaction.showModal(createExchangeModal());
       }
 
       if (type === "middleman") {
@@ -1059,7 +1053,7 @@ module.exports = (client) => {
         });
       }
 
-      const existing = interaction.guild.channels.cache.find(c => c.topic?.startsWith(interaction.user.id));
+      const existing = interaction.guild.channels.cache.find(c => c.topic?.startsWith(`${interaction.user.id}:`));
       if (existing) {
         return interaction.reply({
           content: `${EMOJI.warning} Masz juz ticket: ${existing}`,
@@ -1135,29 +1129,55 @@ module.exports = (client) => {
     // =========================
     // EXCHANGE MODAL SUBMIT
     // =========================
-    if (interaction.isModalSubmit() && interaction.customId === "exchange_amount_modal") {
-      const amount = interaction.fields.getTextInputValue("exchange_amount");
-      const selection = pendingExchanges.get(interaction.user.id) || {};
-      pendingExchanges.delete(interaction.user.id);
-      const from = normalizeExchangeMethod(selection.from);
-      const to = normalizeExchangeMethod(selection.to);
-      const currency = normalizeCurrency(selection.currency);
+    if (interaction.isModalSubmit() && interaction.customId === "exchange_full_modal") {
+      const amountRaw = interaction.fields
+        .getTextInputValue("exchange_amount")
+        .trim()
+        .replace(",", ".");
+      const from = normalizeExchangeMethod(
+        interaction.fields.getTextInputValue("exchange_from")
+      );
+      const to = normalizeExchangeMethod(
+        interaction.fields.getTextInputValue("exchange_to")
+      );
+      const currencyRaw = interaction.fields
+        .getTextInputValue("exchange_currency")
+        .trim()
+        .toUpperCase();
+      const currency = ["PLN", "EUR", "USD"].includes(currencyRaw)
+        ? currencyRaw
+        : null;
+      const amount = Number(amountRaw);
 
-      if (!amount || isNaN(amount)) {
+      if (!Number.isFinite(amount) || amount <= 0) {
         return interaction.reply({
-          content: `${EMOJI.warning} Kwota musi być liczbą.`,
+          content: `${EMOJI.warning} Kwota musi być poprawną liczbą większą od zera.`,
           ephemeral: true
         });
       }
 
       if (!from || !to) {
         return interaction.reply({
-          content: `${EMOJI.warning} Wybierz poprawne metody płatności.`,
+          content: `${EMOJI.warning} Podaj poprawne metody płatności, np. BLIK, PAYPAL albo LTC.`,
           ephemeral: true
         });
       }
 
-      const existing = interaction.guild.channels.cache.find(c => c.topic?.startsWith(interaction.user.id));
+      if (from === to) {
+        return interaction.reply({
+          content: `${EMOJI.warning} Metoda źródłowa i docelowa nie mogą być takie same.`,
+          ephemeral: true
+        });
+      }
+
+      if (!currency) {
+        return interaction.reply({
+          content: `${EMOJI.warning} Waluta musi mieć wartość PLN, EUR albo USD.`,
+          ephemeral: true
+        });
+      }
+
+      const existing = interaction.guild.channels.cache.find(c => c.topic?.startsWith(`${interaction.user.id}:`));
       if (existing) {
         return interaction.reply({
           content: `${EMOJI.warning} Masz już ticket: ${existing}`,
@@ -1179,7 +1199,6 @@ module.exports = (client) => {
       if (!calculated) {
         return interaction.reply({ content: `${EMOJI.warning} Nie można obliczyć tej wymiany.`, ephemeral: true });
       }
-      const { amount: numericAmount, fee, afterFee } = calculated;
       const exchangePayload = { ...calculated, userId: interaction.user.id, createdAt: Date.now() };
 
       await interaction.deferReply({ ephemeral: true });
@@ -1187,7 +1206,7 @@ module.exports = (client) => {
       const channel = await interaction.guild.channels.create({
         name: unlockTicketName(`${from.toLowerCase()}-${to.toLowerCase()}-${interaction.user.username}`),
         parent: CATEGORY_UNCLAIMED_ID,
-        topic: `${interaction.user.id}:exchange:${amount}:${from}:${to}:${currency}`,
+        topic: `${interaction.user.id}:exchange:${calculated.amount}:${from}:${to}:${currency}`,
         type: ChannelType.GuildText,
         permissionOverwrites: [
           { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
