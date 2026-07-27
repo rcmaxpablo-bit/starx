@@ -64,6 +64,9 @@ if (!TOKEN) {
 
 const modules = [
 
+  // Panel Klienta musi zarejestrować obsługę interakcji jako pierwszy.
+  // Dzięki temu menu oraz /panelklienta są potwierdzane natychmiast.
+  "./customerLegitSystem",
   "./tickets",
   "./welcome",
   "./autolc",
@@ -78,8 +81,7 @@ const modules = [
   "./invites",
   "./lc",
   "./giveaway",
-  "./przejmij",
-  "./customerLegitSystem"
+  "./przejmij"
 ];
 
 for (const mod of modules) {

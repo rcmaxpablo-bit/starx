@@ -85,3 +85,90 @@ test('autolc.js nie zawiera śmieci z pliku .gitignore', () => {
   assert.doesNotMatch(source, /^\s*\*\.tmp\s*$/m);
   assert.match(source, /module\.exports\s*=\s*client\s*=>/);
 });
+
+test('panelManager odnajduje i edytuje panel starszy niż 100 wiadomości', async () => {
+  const store = require('../dataStore');
+  const originalGet = store.getPanelMessageId;
+  const originalSet = store.setPanelMessageId;
+
+  store.getPanelMessageId = () => null;
+  store.setPanelMessageId = () => 'old-panel';
+
+  delete require.cache[require.resolve('../panelManager')];
+  const { upsertPanel } = require('../panelManager');
+
+  let edited = 0;
+  let sent = 0;
+
+  const oldPanel = {
+    id: 'old-panel',
+    author: { id: 'bot' },
+    components: [
+      {
+        components: [
+          { customId: 'starx_customer_panel_legacy' }
+        ]
+      }
+    ],
+    embeds: [{ title: '🌟 StarX Exchange » PANEL KLIENTA' }],
+    createdTimestamp: 1,
+    edit: async () => {
+      edited += 1;
+      return oldPanel;
+    },
+    delete: async () => {}
+  };
+
+  const firstPage = new Map();
+  for (let i = 0; i < 100; i += 1) {
+    firstPage.set(`recent-${i}`, {
+      id: `recent-${i}`,
+      author: { id: 'someone-else' },
+      components: [],
+      embeds: [],
+      createdTimestamp: 1000 - i,
+      delete: async () => {}
+    });
+  }
+  firstPage.last = () => [...firstPage.values()].at(-1);
+
+  const secondPage = new Map([['old-panel', oldPanel]]);
+  secondPage.last = () => oldPanel;
+
+  const channel = {
+    id: 'customer-channel',
+    client: { user: { id: 'bot' } },
+    isTextBased: () => true,
+    messages: {
+      fetch: async argument => {
+        if (argument?.before) return secondPage;
+        return firstPage;
+      }
+    },
+    send: async () => {
+      sent += 1;
+      return oldPanel;
+    }
+  };
+
+  try {
+    const result = await upsertPanel(
+      channel,
+      { content: 'nowa wersja' },
+      {
+        panelKey: 'customer-panel',
+        customIdPrefixes: ['starx_customer_panel'],
+        embedTitleIncludes: 'PANEL KLIENTA',
+        maxScan: 300
+      }
+    );
+
+    assert.equal(result.id, 'old-panel');
+    assert.equal(edited, 1);
+    assert.equal(sent, 0);
+  } finally {
+    store.getPanelMessageId = originalGet;
+    store.setPanelMessageId = originalSet;
+    delete require.cache[require.resolve('../panelManager')];
+  }
+});

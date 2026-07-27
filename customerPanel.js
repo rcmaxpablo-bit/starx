@@ -127,6 +127,10 @@ async function resolveCustomerId(message) {
 }
 
 module.exports = (client) => {
+  // Zabezpieczenie przed przypadkowym podwójnym załadowaniem modułu.
+  if (client.__starxCustomerPanelLoaded) return;
+  client.__starxCustomerPanelLoaded = true;
+
   const repIds = new Set();
   let renameTimer = null;
   let pendingCount = 0;
@@ -150,8 +154,12 @@ module.exports = (client) => {
         channel,
         customerPanelPayload(),
         {
+          panelKey: 'customer-panel',
           customId: CUSTOMER_MENU_ID,
-          embedTitle: '🌟 StarX Exchange » PANEL KLIENTA'
+          customIdPrefixes: ['starx_customer_panel'],
+          embedTitle: '🌟 StarX Exchange » PANEL KLIENTA',
+          embedTitleIncludes: 'PANEL KLIENTA',
+          maxScan: 1500
         }
       );
 
@@ -290,40 +298,44 @@ module.exports = (client) => {
     await replaceLegitPanel('start').catch(() => {});
   });
 
-  // Rejestrujemy obsługę Panelu Klienta jako pierwszą. W projekcie jest wiele
-  // listenerów interactionCreate; prependListener gwarantuje, że panel potwierdzi
-  // interakcję zanim inne moduły zaczną ją sprawdzać.
-  client.prependListener(Events.InteractionCreate, async interaction => {
+  // Ten moduł jest ładowany jako pierwszy w index.js. Używamy zwykłego
+  // client.on, ponieważ jest obsługiwany przez każdą wersję klienta discord.js.
+  // Wcześniejsze prependListener mogło nie zarejestrować obsługi na części
+  // środowisk, przez co Discord pokazywał „Aplikacja nie reaguje”.
+  const handleCustomerPanelInteraction = async interaction => {
     const isPanelCommand =
       interaction.isChatInputCommand?.() &&
       interaction.commandName === 'panelklienta';
 
+    const customId = String(interaction.customId || '');
+    const messageHasCustomerPanelTitle =
+      interaction.message?.embeds?.some(embed =>
+        String(embed?.title || '')
+          .toUpperCase()
+          .includes('PANEL KLIENTA')
+      );
+
     const isPanelMenu =
       interaction.isStringSelectMenu?.() &&
       (
-        interaction.customId === CUSTOMER_MENU_ID ||
+        customId === CUSTOMER_MENU_ID ||
+        customId.startsWith('starx_customer_panel') ||
         (
           interaction.channelId === CUSTOMER_PANEL_CHANNEL_ID &&
-          interaction.message?.embeds?.some(embed =>
-            String(embed.title || '').toUpperCase().includes('PANEL KLIENTA')
-          )
+          messageHasCustomerPanelTitle
         )
       );
 
     if (!isPanelCommand && !isPanelMenu) return;
 
     try {
-      // Potwierdzamy każdą interakcję od razu. Użycie liczbowej flagi 64 jest
-      // zgodne ze wszystkimi wersjami discord.js v14 i nie zależy od eksportu
-      // MessageFlags w konkretnej wersji biblioteki.
+      // Najpierw potwierdzamy interakcję, dopiero potem czytamy pliki i
+      // przeszukujemy historię kanału. Zapobiega to timeoutowi po 3 sekundach.
       if (!interaction.deferred && !interaction.replied) {
         await interaction.deferReply({ flags: 64 });
       }
 
       if (isPanelCommand) {
-        // Komenda i tak jest wdrażana z uprawnieniem Administrator, dlatego nie
-        // blokujemy jej ponownie przez memberPermissions (w niektórych cache'ach
-        // Discord zwraca tam null i komenda wcześniej kończyła się timeoutem).
         const message = await publishCustomerPanel(
           `/panelklienta przez ${interaction.user.id}`
         );
@@ -345,7 +357,7 @@ module.exports = (client) => {
       );
 
       const content = isPanelCommand
-        ? `❌ Nie udało się wysłać Panelu Klienta na <#${CUSTOMER_PANEL_CHANNEL_ID}>: ${String(error?.message || error).slice(0, 500)}`
+        ? `❌ Nie udało się zaktualizować Panelu Klienta na <#${CUSTOMER_PANEL_CHANNEL_ID}>: ${String(error?.message || error).slice(0, 500)}`
         : `❌ Nie udało się odczytać danych Panelu Klienta: ${String(error?.message || error).slice(0, 300)}`;
 
       if (interaction.deferred || interaction.replied) {
@@ -354,7 +366,10 @@ module.exports = (client) => {
 
       return interaction.reply({ content, flags: 64 }).catch(() => {});
     }
-  });
+  };
+
+  client.on(Events.InteractionCreate, handleCustomerPanelInteraction);
+  console.log('✅ Obsługa interakcji Panelu Klienta została zarejestrowana.');
 
   client.on(Events.MessageCreate, async message => {
     if (message.channelId !== LEGIT_CHANNEL_ID || !isRep(message.content)) return;

@@ -90,15 +90,14 @@ function makeClient() {
   return client;
 }
 
-test('obsługa Panelu Klienta jest pierwszym listenerem', () => {
+test('obsługa Panelu Klienta jest rejestrowana przez client.on', () => {
   const { setup } = loadCustomerPanel();
   const client = makeClient();
-  const oldListener = () => {};
-  client.on('interactionCreate', oldListener);
 
   setup(client);
 
-  assert.notEqual(client.listeners('interactionCreate')[0], oldListener);
+  assert.equal(client.listeners('interactionCreate').length, 1);
+  assert.equal(typeof client.listeners('interactionCreate')[0], 'function');
 });
 
 test('menu Panelu Klienta jest natychmiast odraczane i edytowane', async () => {
