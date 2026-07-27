@@ -228,6 +228,14 @@ client.once(
             "Legit check template"
           ),
 
+        new SlashCommandBuilder()
+
+          .setName("dane")
+
+          .setDescription(
+            "Wyślij dane płatności na tickecie"
+          ),
+
         // =====================================
         // PRZEJMIJ
         // =====================================

@@ -58,6 +58,8 @@ module.exports = (client) => {
   const claimedTickets = new Map();
   const userStats = new Map();
   const pendingLegitTickets = new Map(); // clientId -> ticketChannelId
+  const pendingPaymentData = new Map(); // channelId:userId -> dane z /dane
+  const autoLegitSent = new Set(); // channelId - ochrona przed podwójnym wysłaniem
 
   function getUserStats(userId) {
     if (!userStats.has(userId)) userStats.set(userId, { exchanges: 8, total: 369 });
@@ -302,19 +304,28 @@ module.exports = (client) => {
   function ticketButtons(isClaimed = false) {
     return new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setCustomId("close_ticket")
-        .setEmoji({ id: "1499784378992295956", animated: true })
-        .setStyle(ButtonStyle.Danger),
-      new ButtonBuilder()
         .setCustomId(isClaimed ? "unclaim_ticket" : "claim_ticket")
-        .setEmoji(isClaimed ? { id: "1510596058470809690" } : { id: "1501697222901895258" })
+        .setLabel(isClaimed ? "Odprzejmij Ticket" : "Przejmij Ticket")
+        .setEmoji(isClaimed ? "🔓" : "🔒")
         .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
+        .setCustomId("ticket_settings")
+        .setLabel("Ustawienia Ticketa")
+        .setEmoji("⚙️")
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId("close_ticket")
+        .setLabel("Zamknij/Wykonane")
+        .setEmoji("✅")
+        .setStyle(ButtonStyle.Danger),
+      new ButtonBuilder()
         .setCustomId("send_legit_check")
-        .setEmoji({ id: "1499784353012514917", animated: true })
+        .setLabel("Legit Check")
+        .setEmoji("📣")
         .setStyle(ButtonStyle.Success)
     );
   }
+
 
 
   function createPurchaseLegitModal() {
@@ -579,6 +590,10 @@ module.exports = (client) => {
         .setLabel("LTC")
         .setValue("LTC")
         .setEmoji({ id: "1499784285211726014" }),
+      new StringSelectMenuOptionBuilder().setLabel("BTC").setValue("BTC").setEmoji("₿"),
+      new StringSelectMenuOptionBuilder().setLabel("ETH").setValue("ETH").setEmoji("◆"),
+      new StringSelectMenuOptionBuilder().setLabel("SOL").setValue("SOL").setEmoji("◎"),
+      new StringSelectMenuOptionBuilder().setLabel("USDT").setValue("USDT").setEmoji("💵"),
       new StringSelectMenuOptionBuilder()
         .setLabel("CRYPTO")
         .setValue("CRYPTO")
@@ -613,7 +628,7 @@ module.exports = (client) => {
 
   function normalizeExchangeMethod(value) {
     const v = String(value || "").trim().toUpperCase().replace(/\s+/g, "");
-    if (["BLIK", "KODBLIK", "PAYPAL", "LTC", "CRYPTO", "PSC", "SKRILL"].includes(v)) return v;
+    if (["BLIK", "KODBLIK", "PAYPAL", "LTC", "BTC", "ETH", "SOL", "USDT", "CRYPTO", "PSC", "SKRILL", "VINTED", "ZEN"].includes(v)) return v;
     if (v === "KOD-BLIK" || v === "KOD_BLIK") return "KODBLIK";
     return null;
   }
@@ -635,6 +650,7 @@ module.exports = (client) => {
     if (v === "KODBLIK") return EMOJI.kodblik;
     if (v === "PAYPAL") return EMOJI.paypal;
     if (v === "LTC") return EMOJI.ltc;
+    if (["BTC", "ETH", "SOL", "USDT"].includes(v)) return EMOJI.crypto;
     if (v === "CRYPTO") return EMOJI.crypto;
     if (v === "PSC") return EMOJI.psc;
     if (v === "SKRILL") return EMOJI.skrill;
@@ -732,6 +748,146 @@ module.exports = (client) => {
       toLabel,
       currencyLabel
     );
+  }
+
+  function isCryptoMethod(value) {
+    return ["LTC", "BTC", "ETH", "SOL", "USDT", "CRYPTO"].includes(normalizeExchangeMethod(value));
+  }
+
+  function rateMethod(value) {
+    const normalized = normalizeExchangeMethod(value);
+    return ["BTC", "ETH", "SOL", "USDT"].includes(normalized) ? "CRYPTO" : normalized;
+  }
+
+  function calculateExchange(amount, from, to, currency = "PLN") {
+    const numericAmount = Number(String(amount).replace(",", "."));
+    const percent = rates[`${rateMethod(from)}->${rateMethod(to)}`];
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0 || !Number.isFinite(percent)) return null;
+    const percentageFee = (numericAmount * percent) / 100;
+    const fee = Math.max(percentageFee, 3);
+    // Zgodnie z wymaganiem zawsze obcinamy do pełnych 10 groszy w dół.
+    const afterFee = Math.floor((numericAmount - fee) * 10) / 10;
+    return {
+      amount: numericAmount,
+      from: normalizeExchangeMethod(from),
+      to: normalizeExchangeMethod(to),
+      currency: normalizeCurrency(currency),
+      percent,
+      fee: Number(fee.toFixed(2)),
+      afterFee: Number(afterFee.toFixed(2))
+    };
+  }
+
+  function buildExchangeEmbed(data, userMention) {
+    return new EmbedBuilder()
+      .setColor(EMBED_COLOR)
+      .setTitle(`${EMOJI.money} 🌟 StarX Exchange × WYMIANA WALUTY`)
+      .setDescription([
+        `> ${EMOJI.arrow} Użytkownik ${userMention} utworzył ticket wymiany.`,
+        `> ${EMOJI.arrow} Realizator odpowie najszybciej jak to możliwe.`,
+        ``, `━━━━━━━━━━━━━━━━━━━━━━━`, ``,
+        `${EMOJI.money} **JAKA KWOTA:**`, `> ${formatCurrency(data.amount, data.currency)}`, ``,
+        `${methodEmoji(data.from)} **Z CZEGO:**`, `> ${displayExchangeMethod(data.from)}`, ``,
+        `${methodEmoji(data.to)} **NA CO:**`, `> ${displayExchangeMethod(data.to)}`, ``,
+        `${currencyEmoji(data.currency)} **JAKĄ WALUTĘ POSIADASZ:**`, `> ${data.currency}`, ``,
+        `${EMOJI.zap} **PROWIZJA:**`, `> ${data.percent}% — ${formatCurrency(data.fee, data.currency)} (minimum 3 PLN)`, ``,
+        `${EMOJI.pin} **PO PROWIZJI:**`, `> ${formatCurrency(data.afterFee, data.currency)}`
+      ].join("\n"))
+      .setImage(BANNER_TICKET_URL)
+      .setFooter({ text: "© 2026 StarX Exchange" });
+  }
+
+  function createTicketSettingsModal(channel) {
+    const current = exchangeData.get(channel.id) || (() => {
+      const parts = String(channel.topic || "").split(":");
+      const calculated = calculateExchange(parts[2], parts[3], parts[4], parts[5]);
+      return calculated;
+    })();
+    return new ModalBuilder()
+      .setCustomId("ticket_settings_modal")
+      .setTitle("Ustawienia ticketa")
+      .addComponents(
+        new ActionRowBuilder().addComponents(new TextInputBuilder()
+          .setCustomId("settings_amount").setLabel("Kwota wymiany")
+          .setValue(current ? current.amount.toFixed(2) : "")
+          .setPlaceholder("Np. 50").setStyle(TextInputStyle.Short).setRequired(true)),
+        new ActionRowBuilder().addComponents(new TextInputBuilder()
+          .setCustomId("settings_from").setLabel("Metoda płatności (z czego)")
+          .setValue(current ? displayExchangeMethod(current.from) : "BLIK")
+          .setPlaceholder("BLIK / PAYPAL / LTC").setStyle(TextInputStyle.Short).setRequired(true)),
+        new ActionRowBuilder().addComponents(new TextInputBuilder()
+          .setCustomId("settings_to").setLabel("Waluta/metoda docelowa (na co)")
+          .setValue(current ? displayExchangeMethod(current.to) : "LTC")
+          .setPlaceholder("LTC / BTC / ETH / SOL / USDT").setStyle(TextInputStyle.Short).setRequired(true))
+      );
+  }
+
+  async function syncTicketEmbeds(channel, data) {
+    const clientId = String(channel.topic || "").split(":")[0];
+    const messages = await channel.messages.fetch({ limit: 100 }).catch(() => null);
+    if (!messages) return 0;
+    let edited = 0;
+    for (const message of messages.values()) {
+      if (message.author.id !== client.user.id || !message.embeds.length) continue;
+      const embeds = message.embeds.map(embed => {
+        const json = embed.toJSON();
+        const text = `${json.title || ""}\n${json.description || ""}`;
+        if (/WYMIANA WALUTY|PODSUMOWANIE WYMIANY|Informacje O Transakcji/i.test(text)) {
+          return buildExchangeEmbed(data, clientId ? `<@${clientId}>` : "użytkownik");
+        }
+        if (/WYSTAW LEGIT CHECKA|LEGIT CHECK/i.test(text) && json.description) {
+          const fromTo = `${displayExchangeMethod(data.from)} TO ${displayExchangeMethod(data.to)}`;
+          json.description = json.description.replace(/Exchanged\s+[^\n`]+/i,
+            `Exchanged ${fromTo} ${formatCurrency(data.amount, data.currency)}`);
+          return EmbedBuilder.from(json);
+        }
+        return EmbedBuilder.from(json);
+      });
+      const changed = embeds.some((embed, i) => JSON.stringify(embed.toJSON()) !== JSON.stringify(message.embeds[i].toJSON()));
+      if (changed) {
+        await message.edit({ embeds }).catch(err => console.error("TICKET SYNC EDIT ERROR:", err?.message || err));
+        edited += 1;
+      }
+    }
+    return edited;
+  }
+
+  function createPaymentDataModal(method) {
+    const modal = new ModalBuilder().setCustomId("payment_data_modal").setTitle(`Dane płatności • ${displayExchangeMethod(method)}`);
+    if (isCryptoMethod(method)) {
+      return modal.addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder()
+        .setCustomId("wallet_address").setLabel("Adres portfela")
+        .setPlaceholder(`Adres ${displayExchangeMethod(method)}`).setStyle(TextInputStyle.Short).setRequired(true)));
+    }
+    return modal.addComponents(
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("payment_receiver").setLabel("Odbiorca").setStyle(TextInputStyle.Short).setRequired(true)),
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("payment_title").setLabel("Tytuł").setStyle(TextInputStyle.Short).setRequired(true)),
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("payment_phone").setLabel("Numer telefonu").setStyle(TextInputStyle.Short).setRequired(true))
+    );
+  }
+
+  async function sendExchangeLegit(channel, exchangerUser, deleteMessage = null) {
+    if (autoLegitSent.has(channel.id)) return false;
+    const parts = String(channel.topic || "").split(":");
+    if (parts[1] !== "exchange") return false;
+    const data = exchangeData.get(channel.id) || calculateExchange(parts[2], parts[3], parts[4], parts[5]);
+    if (!data) return false;
+    autoLegitSent.add(channel.id);
+    const clientId = parts[0];
+    const fromTo = `${displayExchangeMethod(data.from)} TO ${displayExchangeMethod(data.to)}`;
+    const legitText = `+rep <@${exchangerUser.id}> Exchanged ${fromTo} ${formatCurrency(data.amount, data.currency)}`;
+    await channel.send({
+      content: clientId ? `<@${clientId}>` : undefined,
+      embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setTitle("🌟 StarX Exchange × WYSTAW LEGIT CHECKA")
+        .setDescription([
+          `> ${EMOJI.arrow} Dziękujemy ${clientId ? `<@${clientId}>` : ""} za **skorzystanie z naszych usług**.`,
+          `> ${EMOJI.arrow} Prosimy o wystawienie legit checka na kanale <#${LEGIT_CHECK_CHANNEL_ID}>`, "",
+          `> ${EMOJI.arrow} **Wzór:**`, "```text", legitText, "```", "",
+          `> ${EMOJI.arrow} Po wystawieniu legit checka ticket zostanie **automatycznie zamknięty**.`
+        ].join("\n")).setImage(BANNER_LEGIT_URL).setFooter({ text: "© 2026 StarX Exchange" })]
+    });
+    if (deleteMessage) await deleteMessage.delete().catch(() => {});
+    return true;
   }
 
   // =========================================
@@ -1062,7 +1218,7 @@ module.exports = (client) => {
         });
       }
 
-      const exchange = `${from}->${to}`;
+      const exchange = `${rateMethod(from)}->${rateMethod(to)}`;
       const percent = rates[exchange];
 
       if (!percent) {
@@ -1072,22 +1228,12 @@ module.exports = (client) => {
         });
       }
 
-      const numericAmount = Number(amount);
-      const percentageFee = (numericAmount * percent) / 100;
-      const fee = Math.max(percentageFee, 3);
-      const afterFee = (numericAmount - fee).toFixed(2);
-
-      const exchangePayload = {
-        userId: interaction.user.id,
-        amount: numericAmount,
-        from,
-        to,
-        currency,
-        percent,
-        fee: Number(fee.toFixed(2)),
-        afterFee: Number(afterFee),
-        createdAt: Date.now()
-      };
+      const calculated = calculateExchange(amount, from, to, currency);
+      if (!calculated) {
+        return interaction.reply({ content: `${EMOJI.warning} Nie można obliczyć tej wymiany.`, ephemeral: true });
+      }
+      const { amount: numericAmount, fee, afterFee } = calculated;
+      const exchangePayload = { ...calculated, userId: interaction.user.id, createdAt: Date.now() };
 
       const channel = await interaction.guild.channels.create({
         name: unlockTicketName(`${from.toLowerCase()}-${to.toLowerCase()}-${interaction.user.username}`),
@@ -1117,35 +1263,7 @@ module.exports = (client) => {
         ]
       });
 
-      const embed = new EmbedBuilder()
-        .setColor(EMBED_COLOR)
-        .setTitle(`${EMOJI.money} 🌟 StarX Exchange × WYMIANA WALUTY`)
-        .setDescription([
-          `> ${EMOJI.arrow} Użytkownik ${interaction.user} utworzył ticket wymiany.`,
-          `> ${EMOJI.arrow} Realizator odpowie najszybciej jak to możliwe.`,
-          ``,
-          `━━━━━━━━━━━━━━━━━━━━━━━`,
-          ``,
-          `${EMOJI.money} **JAKA KWOTA:**`,
-          `> ${formatCurrency(amount, currency)}`,
-          ``,
-          `${methodEmoji(from)} **Z CZEGO:**`,
-          `> ${displayExchangeMethod(from)}`,
-          ``,
-          `${methodEmoji(to)} **NA CO:**`,
-          `> ${displayExchangeMethod(to)}`,
-          ``,
-          `${currencyEmoji(currency)} **JAKĄ WALUTĘ POSIADASZ:**`,
-          `> ${currency}`,
-          ``,
-          `${EMOJI.zap} **PROWIZJA:**`,
-          `> ${percent}% — ${formatCurrency(fee, currency)} (minimum 3 PLN)`,
-          ``,
-          `${EMOJI.pin} **PO PROWIZJI:**`,
-          `> ${formatCurrency(afterFee, currency)}`
-        ].join("\n"))
-        .setImage(BANNER_TICKET_URL)
-        .setFooter({ text: "© 2026 StarX Exchange" });
+      const embed = buildExchangeEmbed(exchangePayload, interaction.user);
 
       exchangeData.set(channel.id, exchangePayload);
 
@@ -1161,6 +1279,94 @@ module.exports = (client) => {
       });
     }
 
+
+    // =========================
+    // TICKET SETTINGS
+    // =========================
+    if (interaction.isButton() && interaction.customId === "ticket_settings") {
+      if (!interaction.member.roles.cache.has(REALIZATOR_ROLE_ID)) {
+        return interaction.reply({ content: `${EMOJI.warning} Tylko realizator może zmieniać ustawienia ticketa.`, ephemeral: true });
+      }
+      if (String(interaction.channel.topic || "").split(":")[1] !== "exchange") {
+        return interaction.reply({ content: `${EMOJI.warning} Ustawienia wymiany są dostępne tylko na ticketach wymiany.`, ephemeral: true });
+      }
+      return interaction.showModal(createTicketSettingsModal(interaction.channel));
+    }
+
+    if (interaction.isModalSubmit() && interaction.customId === "ticket_settings_modal") {
+      if (!interaction.member.roles.cache.has(REALIZATOR_ROLE_ID)) {
+        return interaction.reply({ content: `${EMOJI.warning} Brak uprawnień.`, ephemeral: true });
+      }
+      const amount = interaction.fields.getTextInputValue("settings_amount").trim().replace(",", ".");
+      const from = normalizeExchangeMethod(interaction.fields.getTextInputValue("settings_from"));
+      const to = normalizeExchangeMethod(interaction.fields.getTextInputValue("settings_to"));
+      const oldInfo = getExchangeInfoFromTicket(interaction.channel);
+      const calculated = calculateExchange(amount, from, to, oldInfo.currency);
+      if (!calculated) {
+        return interaction.reply({ content: `${EMOJI.warning} Niepoprawna kwota/metoda albo brak prowizji dla tej pary.`, ephemeral: true });
+      }
+      const clientId = String(interaction.channel.topic || "").split(":")[0];
+      await interaction.deferReply({ ephemeral: true });
+      await interaction.channel.setTopic(`${clientId}:exchange:${calculated.amount}:${calculated.from}:${calculated.to}:${calculated.currency}`);
+      const baseTicketName = `${calculated.from.toLowerCase()}-${calculated.to.toLowerCase()}-${interaction.channel.name.split("-").at(-1)}`;
+      const nextTicketName = interaction.channel.name.startsWith("lock-")
+        ? lockTicketName(baseTicketName)
+        : unlockTicketName(baseTicketName);
+      await interaction.channel.setName(nextTicketName).catch(() => {});
+      exchangeData.set(interaction.channel.id, { ...calculated, userId: clientId, updatedAt: Date.now() });
+      const edited = await syncTicketEmbeds(interaction.channel, calculated);
+      return interaction.editReply(`${EMOJI.money} Zapisano ustawienia i zaktualizowano ${edited} wiadomości.`);
+    }
+
+    // =========================
+    // /DANE
+    // =========================
+    if (interaction.isChatInputCommand() && interaction.commandName === "dane") {
+      if (!interaction.member.roles.cache.has(REALIZATOR_ROLE_ID)) {
+        return interaction.reply({ content: `${EMOJI.warning} Tylko realizator może użyć /dane.`, ephemeral: true });
+      }
+      const parts = String(interaction.channel.topic || "").split(":");
+      if (parts[1] !== "exchange") {
+        return interaction.reply({ content: `${EMOJI.warning} Komenda działa wyłącznie na tickecie wymiany.`, ephemeral: true });
+      }
+      const method = getExchangeInfoFromTicket(interaction.channel).from;
+      pendingPaymentData.set(`${interaction.channel.id}:${interaction.user.id}`, { method });
+      return interaction.showModal(createPaymentDataModal(method));
+    }
+
+    if (interaction.isModalSubmit() && interaction.customId === "payment_data_modal") {
+      const key = `${interaction.channel.id}:${interaction.user.id}`;
+      const pending = pendingPaymentData.get(key);
+      if (!pending) return interaction.reply({ content: `${EMOJI.warning} Formularz wygasł. Użyj ponownie /dane.`, ephemeral: true });
+      pendingPaymentData.delete(key);
+      const method = pending.method;
+      const lines = [`**Exchanger:**`, `${interaction.user}`, ``, `**Metoda:**`, `${displayExchangeMethod(method)}`, ``];
+      let copyText;
+      if (isCryptoMethod(method)) {
+        const address = interaction.fields.getTextInputValue("wallet_address").trim();
+        lines.push(`**Adres ${displayExchangeMethod(method)}:**`, address);
+        copyText = address;
+      } else {
+        const receiver = interaction.fields.getTextInputValue("payment_receiver").trim();
+        const title = interaction.fields.getTextInputValue("payment_title").trim();
+        const phone = interaction.fields.getTextInputValue("payment_phone").trim();
+        lines.push(`**Odbiorca:**`, receiver, ``, `**Tytuł:**`, title, ``, `**Nr:**`, phone);
+        copyText = `Odbiorca: ${receiver}\nTytuł: ${title}\nNr: ${phone}`;
+      }
+      await interaction.reply({
+        embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setTitle("🌟 StarX Exchange × DANE PŁATNOŚCI").setDescription(lines.join("\n")).setFooter({ text: "© 2026 StarX Exchange" })],
+        components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId("copy_payment_data").setLabel("Kopiuj dane").setEmoji("📋").setStyle(ButtonStyle.Secondary))]
+      });
+      const sent = await interaction.fetchReply().catch(() => null);
+      if (sent) pendingPaymentData.set(`message:${sent.id}`, { copyText });
+      return;
+    }
+
+    if (interaction.isButton() && interaction.customId === "copy_payment_data") {
+      const data = pendingPaymentData.get(`message:${interaction.message.id}`);
+      if (!data) return interaction.reply({ content: `${EMOJI.warning} Nie udało się odczytać danych.`, ephemeral: true });
+      return interaction.reply({ content: `\`\`\`text\n${data.copyText}\n\`\`\``, ephemeral: true });
+    }
 
     // =========================
     // CLAIM BUTTON
@@ -1495,6 +1701,21 @@ module.exports = (client) => {
       }, 1000);
 
       return;
+    }
+  });
+
+  client.on(Events.MessageCreate, async message => {
+    try {
+      if (message.author.bot || !message.guild || message.content.trim().toLowerCase() !== "sent") return;
+      const parts = String(message.channel.topic || "").split(":");
+      if (parts[1] !== "exchange") return;
+      const claimedId = claimedTickets.get(message.channel.id);
+      const exchanger = claimedId
+        ? await message.guild.members.fetch(claimedId).then(m => m.user).catch(() => message.author)
+        : message.author;
+      await sendExchangeLegit(message.channel, exchanger, message);
+    } catch (err) {
+      console.error("AUTO SENT LEGIT ERROR:", err?.stack || err);
     }
   });
 };
