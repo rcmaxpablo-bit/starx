@@ -3,9 +3,7 @@ const { upsertPanel } = require("./panelManager");
 
 module.exports = (client) => {
 
-  // =========================
   // CONFIG
-  // =========================
   const CHANNEL_ID = "1500893110048133253"; // kanał rep
   const TARGET_ROLE_ID = "1499572498604363918";
 
@@ -14,9 +12,7 @@ module.exports = (client) => {
 
   let panelMessage = null;
 
-  // =========================
   // PANEL
-  // =========================
   async function sendPanel(channel) {
     const embed = new EmbedBuilder()
       .setColor('#1b2dff')
@@ -47,9 +43,7 @@ module.exports = (client) => {
     });
   }
 
-  // =========================
   // READY
-  // =========================
   client.once(Events.ClientReady, async () => {
     try {
       const channel = await client.channels.fetch(CHANNEL_ID);
@@ -64,9 +58,7 @@ module.exports = (client) => {
     }
   });
 
-  // =========================
   // NOWE WIADOMOŚCI
-  // =========================
   client.on(Events.MessageCreate, async (message) => {
     try {
       if (message.channel.id !== CHANNEL_ID) return;

@@ -11,9 +11,7 @@ module.exports = (client) => {
   const inviteCache = new Map();
   const personalInvites = new Map();
 
-  // ==========================
   // CONFIG
-  // ==========================
   const LOG_CHANNEL_ID = "1500261480212205629";
 
   const ROLE_5 = "1500270028635771032";   // -5%
@@ -21,9 +19,7 @@ module.exports = (client) => {
 
   const OWNER_ROLE_ID = "1499499185337012377";
 
-  // ==========================
   // IMPORT STARYCH LOGÓW
-  // ==========================
   function parseInviteLogMessage(message) {
     const parts = [message.content || ""];
 
@@ -106,9 +102,7 @@ module.exports = (client) => {
     }
   }
 
-  // ==========================
   // READY
-  // ==========================
   client.once(Events.ClientReady, async () => {
 
     try {
@@ -132,9 +126,7 @@ module.exports = (client) => {
     }
   });
 
-  // ==========================
   // NAGRODY RANG
-  // ==========================
   async function updateRewardRoles(member, total) {
 
     if (!member) return;
@@ -162,9 +154,7 @@ module.exports = (client) => {
     await member.roles.remove(ROLE_10).catch(() => {});
   }
 
-  // ==========================
   // JOIN TRACKER
-  // ==========================
   client.on(Events.GuildMemberAdd, async member => {
 
     try {
@@ -216,9 +206,7 @@ module.exports = (client) => {
 
       await updateRewardRoles(inviterMember, total);
 
-      // ======================
       // LOG
-      // ======================
       const logChannel =
         await guild.channels
           .fetch(LOG_CHANNEL_ID)
@@ -274,18 +262,14 @@ module.exports = (client) => {
     }
   });
 
-  // ==========================
   // COMMANDS
-  // ==========================
   client.on(Events.InteractionCreate, async interaction => {
 
     try {
 
       if (!interaction.isChatInputCommand()) return;
 
-      // ======================
       // /myinvite
-      // ======================
       if (interaction.commandName === "myinvite") {
 
         const invite =
@@ -317,9 +301,7 @@ https://discord.gg/${invite.code}`
         });
       }
 
-      // ======================
       // /invites
-      // ======================
       if (interaction.commandName === "invites") {
 
         const amount = store.getInviteCount(interaction.guild.id, interaction.user.id);
@@ -341,9 +323,7 @@ Zaprosiłeś **${amount}** osób.
         });
       }
 
-      // ======================
       // /checkinvites
-      // ======================
       if (interaction.commandName === "checkinvites") {
 
         const user =
@@ -366,9 +346,7 @@ Posiada **${amount}** zaproszeń.`
         });
       }
 
-      // ======================
       // /topinvites
-      // ======================
       if (interaction.commandName === "topinvites") {
 
         const members =
@@ -406,9 +384,7 @@ Posiada **${amount}** zaproszeń.`
         });
       }
 
-      // ======================
       // /testinvite OWNER ONLY
-      // ======================
       if (interaction.commandName === "testinvite") {
 
         if (

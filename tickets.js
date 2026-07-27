@@ -17,9 +17,7 @@ const store = require("./dataStore");
 
 module.exports = (client) => {
 
-  // =========================================
   // CONFIG
-  // =========================================
   const PANEL_CHANNEL_ID = "1509429804770791494";
   const REALIZATOR_ROLE_ID = "1500930428993933373";
   const CLIENT_ROLE_ID = "1499572498604363918";
@@ -45,14 +43,10 @@ module.exports = (client) => {
   const BANNER_TICKET_URL = process.env.BANNER_TICKET_URL || "https://i.imgur.com/QYhsGEm_d.webp?maxwidth=760&fidelity=grand";
   const BANNER_LEGIT_URL = process.env.BANNER_LEGIT_URL || "https://i.imgur.com/QYhsGEm_d.webp?maxwidth=760&fidelity=grand";
 
-  // =========================================
   // COLOR
-  // =========================================
   const EMBED_COLOR = "#1b2dff";
 
-  // =========================================
   // TEMP DATA
-  // =========================================
   const exchangeData = new Map();
   const claimedTickets = new Map();
   const userStats = new Map();
@@ -397,14 +391,10 @@ module.exports = (client) => {
       );
   }
 
-  // =========================================
   // EMOJI
-  // =========================================
   const EMOJI = {
 
-    // =========================
     // TICKETY / SYSTEM
-    // =========================
     ticket: "<:TICKET:1501697124734206032>",
     pin: "<:PIN:1501697389050986546>",
     zap: "<:PIORUN:1501697151737139350>",
@@ -416,16 +406,12 @@ module.exports = (client) => {
     list: "<:LIST:1501693215328440370>",
     clock: "<:CZAS:1502030015943151868>",
 
-    // =========================
     // MONEY / ANIMOWANE
-    // =========================
     money: "<a:m_:1501685438103031920>",
     arrow: "<a:Arrow_White:1508094625984811038>",
     nitro: "<a:nitro:1501684762601848963>",
 
-    // =========================
     // PAYMENT METHODS
-    // =========================
     blik: "<:blik:1499784231608389742>",
     kodblik: "<:blik:1499784231608389742>",
     paypal: "<:paypal:1499784258091483236>",
@@ -436,9 +422,7 @@ module.exports = (client) => {
     vinted: "🟦",
     zen: "⚪",
 
-    // =========================
     // SHOP / STREAMING
-    // =========================
     spotify: "<:Spotify:1500238701718933627>",
     netflix: "<:Netflix:1500238788306403398>",
     ytpremium: "<:ytpremium:1500239415937859605>",
@@ -450,29 +434,21 @@ module.exports = (client) => {
     capcut: "<:Capcut:1502002116405887039>",
     cda: "<:CDA:1508077411873325076>",
 
-    // =========================
     // VPN
-    // =========================
     nordvpn: "<:NORDVPN:1501999409343369400>",
     mullvad: "<:mullvad:1501999834159255712>",
     tunnelbear: "<:TUNNELBEARVPN:1502000450009042984>",
 
-    // =========================
     // MIDDLEMAN / SHOP
-    // =========================
     middleman: "<:LUDZIE:1500243884733894716>",
     cart: "<:SKLEP:1500243849535033577>",
     box: "<:SKLEP:1500243849535033577>",
 
-    // =========================
     // INNE
-    // =========================
     prime: "<:primevideo:1502001410311716984>"
   };
 
-  // =========================================
   // PROWIZJE
-  // =========================================
   const rates = {
 
     "BLIK->PAYPAL": 2,
@@ -525,9 +501,7 @@ module.exports = (client) => {
     "CRYPTO->VINTED": 4,
   };
 
-  // =========================================
   // MENU
-  // =========================================
   function createMenu() {
 
     return new ActionRowBuilder().addComponents(
@@ -811,9 +785,7 @@ module.exports = (client) => {
     return true;
   }
 
-  // =========================================
   // READY
-  // =========================================
   client.once(Events.ClientReady, async () => {
 
     const channel =
@@ -855,17 +827,13 @@ module.exports = (client) => {
     console.log("✅ Panel ticketów zaktualizowany.");
   });
 
-  // =========================================
   // INTERACTIONS
-  // =========================================
   // Obsługa licznika LC i Panelu Klienta znajduje się w customerLegitSystem.js.
 
   client.on(Events.InteractionCreate, async (interaction) => {
     try {
 
-    // =========================
     // WYBÓR DANYCH WYMIANY
-    // =========================
     if (interaction.isStringSelectMenu() && interaction.customId.endsWith("_select") && interaction.customId.startsWith("exchange_")) {
       const selection = pendingExchanges.get(interaction.user.id) || {};
       const key = { exchange_from_select: "from", exchange_to_select: "to", exchange_currency_select: "currency" }[interaction.customId];
@@ -877,9 +845,7 @@ module.exports = (client) => {
       return interaction.update({ components: exchangeChoiceRows(selection) });
     }
 
-    // =========================
     // MENU
-    // =========================
     if (
       interaction.isStringSelectMenu() &&
       interaction.customId === "ticket_select"
@@ -887,9 +853,7 @@ module.exports = (client) => {
 
       const type = interaction.values[0];
 
-      // =====================================
       // CHECK EXISTING TICKET
-      // =====================================
       const existing =
         interaction.guild.channels.cache.find(c =>
           c.topic?.startsWith(interaction.user.id)
@@ -901,9 +865,7 @@ module.exports = (client) => {
           ephemeral: true
         });
 
-      // =====================================
       // EXCHANGE
-      // =====================================
       if (type === "exchange") {
         pendingExchanges.set(interaction.user.id, {});
         return interaction.reply({
@@ -917,9 +879,7 @@ module.exports = (client) => {
         return interaction.showModal(createMiddlemanModal());
       }
 
-      // =====================================
       // CATEGORY NAME
-      // =====================================
       let categoryName = "Pomoc";
 
       if (type === "buy")
@@ -928,9 +888,7 @@ module.exports = (client) => {
       if (type === "middleman")
         categoryName = "Middleman";
 
-      // =====================================
       // CREATE CHANNEL
-      // =====================================
       // Utworzenie kanału i wysłanie wiadomości może potrwać dłużej niż trzy
       // sekundy. Potwierdzamy interakcję przed rozpoczęciem zapytań do API.
       await interaction.deferReply({ ephemeral: true });
@@ -981,14 +939,10 @@ module.exports = (client) => {
       // Rola Klient NIE jest nadawana przy utworzeniu ticketa.
       // Dostanie ją dopiero kupujący po wysłaniu wiadomości LC.
 
-      // =====================================
       // BUTTON
-      // =====================================
       const row = ticketButtons();
 
-      // =====================================
       // EMBED
-      // =====================================
       const embed =
         new EmbedBuilder()
 
@@ -1014,9 +968,7 @@ module.exports = (client) => {
             text: "© 2026 StarX Exchange"
           });
 
-      // =====================================
       // SEND
-      // =====================================
       await channel.send({
         content:
           `${interaction.user} <@&${REALIZATOR_ROLE_ID}>`,
@@ -1030,9 +982,7 @@ module.exports = (client) => {
       });
     }
 
-    // =========================
     // MIDDLEMAN MODAL SUBMIT
-    // =========================
     if (interaction.isModalSubmit() && interaction.customId === "middleman_modal") {
       const otherUserId = parseUserId(interaction.fields.getTextInputValue("middleman_user_id"));
 
@@ -1132,9 +1082,7 @@ module.exports = (client) => {
       });
     }
 
-    // =========================
     // EXCHANGE MODAL SUBMIT
-    // =========================
     if (interaction.isModalSubmit() && interaction.customId === "exchange_amount_modal") {
       const amount = interaction.fields.getTextInputValue("exchange_amount");
       const selection = pendingExchanges.get(interaction.user.id) || {};
@@ -1228,9 +1176,7 @@ module.exports = (client) => {
     }
 
 
-    // =========================
     // TICKET SETTINGS
-    // =========================
     if (interaction.isButton() && interaction.customId === "ticket_settings") {
       if (!interaction.member.roles.cache.has(REALIZATOR_ROLE_ID)) {
         return interaction.reply({ content: `${EMOJI.warning} Tylko realizator może zmieniać ustawienia ticketa.`, ephemeral: true });
@@ -1266,9 +1212,7 @@ module.exports = (client) => {
       return interaction.editReply(`${EMOJI.money} Zapisano ustawienia i zaktualizowano ${edited} wiadomości.`);
     }
 
-    // =========================
     // /DANE
-    // =========================
     if (interaction.isChatInputCommand() && interaction.commandName === "dane") {
       if (!interaction.member.roles.cache.has(REALIZATOR_ROLE_ID)) {
         return interaction.reply({ content: `${EMOJI.warning} Tylko realizator może użyć /dane.`, ephemeral: true });
@@ -1316,9 +1260,7 @@ module.exports = (client) => {
       return interaction.reply({ content: `\`\`\`text\n${data.copyText}\n\`\`\``, ephemeral: true });
     }
 
-    // =========================
     // CLAIM BUTTON
-    // =========================
     if (interaction.isButton() && interaction.customId === "claim_ticket") {
       if (!interaction.member.roles.cache.has(REALIZATOR_ROLE_ID)) {
         return interaction.reply({ content: `${EMOJI.warning} Nie jesteś realizatorem.`, ephemeral: true });
@@ -1357,9 +1299,7 @@ module.exports = (client) => {
       });
     }
 
-    // =========================
     // UNCLAIM BUTTON
-    // =========================
     if (interaction.isButton() && interaction.customId === "unclaim_ticket") {
       if (!interaction.member.roles.cache.has(REALIZATOR_ROLE_ID)) {
         return interaction.reply({ content: `${EMOJI.warning} Nie jesteś realizatorem.`, ephemeral: true });
@@ -1394,9 +1334,7 @@ module.exports = (client) => {
     }
 
 
-    // =========================
     // PURCHASE LEGIT MODAL
-    // =========================
     if (interaction.isModalSubmit() && interaction.customId === "purchase_legit_modal") {
       if (!interaction.member.roles.cache.has(REALIZATOR_ROLE_ID)) {
         return interaction.reply({
@@ -1470,9 +1408,7 @@ module.exports = (client) => {
       return;
     }
 
-    // =========================
     // MIDDLEMAN LEGIT MODAL
-    // =========================
     if (interaction.isModalSubmit() && interaction.customId === "middleman_legit_modal") {
       if (!interaction.member.roles.cache.has(REALIZATOR_ROLE_ID)) {
         return interaction.reply({
@@ -1542,9 +1478,7 @@ module.exports = (client) => {
       return;
     }
 
-    // =========================
     // SEND LEGIT CHECK BUTTON
-    // =========================
     if (interaction.isButton() && interaction.customId === "send_legit_check") {
       if (!interaction.member.roles.cache.has(REALIZATOR_ROLE_ID)) {
         return interaction.reply({
@@ -1625,9 +1559,7 @@ module.exports = (client) => {
       return;
     }
 
-    // =========================
     // CLOSE
-    // =========================
     if (
       interaction.isButton() &&
       interaction.customId === "close_ticket"

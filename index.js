@@ -9,9 +9,7 @@ const {
   Partials
 } = require("discord.js");
 
-// =====================================
 // CONFIG
-// =====================================
 
 const TOKEN = process.env.TOKEN;
 
@@ -24,9 +22,7 @@ const GUILD_ID =
 const OWNER_ROLE_ID =
   "1499499185337012377";
 
-// =====================================
 // CLIENT
-// =====================================
 
 const client = new Client({
 
@@ -58,9 +54,7 @@ if (!TOKEN) {
   process.exit(1);
 }
 
-// =====================================
 // MODULES
-// =====================================
 
 const modules = [
 
@@ -95,9 +89,7 @@ for (const mod of modules) {
   }
 }
 
-// =====================================
 // READY
-// =====================================
 
 client.once(
   Events.ClientReady,
@@ -111,9 +103,7 @@ client.once(
 
       const commands = [
 
-        // =====================================
         // RESET
-        // =====================================
 
         new SlashCommandBuilder()
 
@@ -139,9 +129,7 @@ client.once(
             PermissionFlagsBits.Administrator
           ),
 
-        // =====================================
         // INVITES
-        // =====================================
 
         new SlashCommandBuilder()
 
@@ -216,9 +204,7 @@ client.once(
               .setRequired(true)
           ),
 
-        // =====================================
         // LC
-        // =====================================
 
         new SlashCommandBuilder()
 
@@ -236,9 +222,7 @@ client.once(
             "Wyślij dane płatności na tickecie"
           ),
 
-        // =====================================
         // PRZEJMIJ
-        // =====================================
 
         new SlashCommandBuilder()
 
@@ -267,9 +251,7 @@ client.once(
             "Oddaj ticket"
           ),
 
-        // =====================================
         // GIVEAWAY
-        // =====================================
 
         new SlashCommandBuilder()
 
@@ -375,9 +357,7 @@ client.once(
               .setRequired(true)
           ),
 
-        // =====================================
         // REROLL
-        // =====================================
 
         new SlashCommandBuilder()
 
@@ -431,9 +411,7 @@ client.once(
   }
 );
 
-// =====================================
 // RESET COMMAND
-// =====================================
 
 client.on(
   Events.InteractionCreate,
@@ -491,9 +469,7 @@ client.on(
   }
 );
 
-// =====================================
 // ERRORS
-// =====================================
 
 process.on(
   "unhandledRejection",
@@ -517,8 +493,6 @@ process.on(
   }
 );
 
-// =====================================
 // LOGIN
-// =====================================
 
 client.login(TOKEN);
