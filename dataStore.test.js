@@ -18,7 +18,7 @@ function createClient() {
   return client;
 }
 
-test("menu wymiany odpowiada modalem", async () => {
+test("menu wymiany otwiera formularz z listami wyboru", async () => {
   const client = createClient();
 
   require("../tickets")(client);
@@ -57,25 +57,37 @@ test("menu wymiany odpowiada modalem", async () => {
 
   await listeners[0](interaction);
 
-  assert.ok(modal, "Modal nie został wyświetlony");
+  assert.ok(modal, "Formularz nie został wyświetlony");
   assert.equal(modal.custom_id, "exchange_full_modal");
   assert.equal(modal.components.length, 4);
 
   assert.ok(
-    modal.components.every(
-      row => row.type === ComponentType.ActionRow
-    ),
-    "Każdy element modala powinien być ActionRow"
+    modal.components.every(component => component.type === ComponentType.Label),
+    "Każde pole formularza powinno znajdować się w komponencie Label"
   );
 
-  assert.ok(
-    modal.components.every(
-      row =>
-        row.components.length === 1 &&
-        row.components[0].type === ComponentType.TextInput
-    ),
-    "Każdy ActionRow powinien zawierać dokładnie jeden TextInput"
-  );
+  const [amount, from, to, currency] = modal.components;
+
+  assert.equal(amount.component.type, ComponentType.TextInput);
+  assert.equal(amount.component.custom_id, "exchange_amount");
+
+  for (const [component, customId] of [
+    [from, "exchange_from"],
+    [to, "exchange_to"],
+    [currency, "exchange_currency"]
+  ]) {
+    assert.equal(component.component.type, ComponentType.StringSelect);
+    assert.equal(component.component.custom_id, customId);
+    assert.ok(component.component.options.length >= 3);
+  }
+
+  for (const option of [...from.component.options, ...to.component.options]) {
+    assert.ok(option.emoji, `Brak emoji dla opcji ${option.value}`);
+    assert.ok(
+      option.emoji.id || option.emoji.name,
+      `Niepoprawne emoji dla opcji ${option.value}`
+    );
+  }
 });
 
 test(

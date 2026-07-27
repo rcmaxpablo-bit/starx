@@ -8,6 +8,7 @@ const {
   ButtonBuilder,
   ButtonStyle,
   ModalBuilder,
+  LabelBuilder,
   TextInputBuilder,
   TextInputStyle
 } = require("discord.js");
@@ -304,22 +305,22 @@ module.exports = (client) => {
       new ButtonBuilder()
         .setCustomId(isClaimed ? "unclaim_ticket" : "claim_ticket")
         .setLabel(isClaimed ? "Odprzejmij Ticket" : "Przejmij Ticket")
-        .setEmoji(isClaimed ? "🔓" : "🔒")
+        .setEmoji(componentEmoji(isClaimed ? EMOJI.unlock : EMOJI.lock))
         .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
         .setCustomId("ticket_settings")
         .setLabel("Ustawienia Ticketa")
-        .setEmoji("⚙️")
+        .setEmoji(componentEmoji(EMOJI.setting))
         .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
         .setCustomId("close_ticket")
         .setLabel("Zamknij/Wykonane")
-        .setEmoji("✅")
+        .setEmoji(componentEmoji(EMOJI.warning))
         .setStyle(ButtonStyle.Danger),
       new ButtonBuilder()
         .setCustomId("send_legit_check")
         .setLabel("Legit Check")
-        .setEmoji("📣")
+        .setEmoji(componentEmoji(EMOJI.pin))
         .setStyle(ButtonStyle.Success)
     );
   }
@@ -413,6 +414,7 @@ module.exports = (client) => {
     admin: "<:ADM:1501989271077388500>",
     list: "<:LIST:1501693215328440370>",
     clock: "<:CZAS:1502030015943151868>",
+    setting: "<:ustawienia:1531392301837062215>",
 
     // =========================
     // MONEY / ANIMOWANE
@@ -467,6 +469,41 @@ module.exports = (client) => {
     // =========================
     prime: "<:primevideo:1502001410311716984>"
   };
+
+  /**
+   * Zamienia zapis Discorda, np. <:blik:123>, na obiekt wymagany przez
+   * przyciski i opcje list wyboru. Unicode emoji pozostają bez zmian.
+   */
+  function componentEmoji(value) {
+    const raw = String(value || "").trim();
+    const match = raw.match(/^<(a?):([A-Za-z0-9_]+):(\d{17,20})>$/);
+
+    if (match) {
+      return {
+        animated: match[1] === "a",
+        name: match[2],
+        id: match[3]
+      };
+    }
+
+    return { name: raw || "💱" };
+  }
+
+  function selectEmojiForMethod(value) {
+    const normalized = normalizeExchangeMethod(value);
+
+    if (normalized === "BLIK") return EMOJI.blik;
+    if (normalized === "KODBLIK") return EMOJI.kodblik;
+    if (normalized === "PAYPAL") return EMOJI.paypal;
+    if (normalized === "LTC") return EMOJI.ltc;
+    if (["BTC", "ETH", "SOL", "USDT", "CRYPTO"].includes(normalized)) return EMOJI.crypto;
+    if (normalized === "PSC") return EMOJI.psc;
+    if (normalized === "SKRILL") return EMOJI.skrill;
+    if (normalized === "VINTED") return EMOJI.vinted;
+    if (normalized === "ZEN") return EMOJI.zen;
+
+    return EMOJI.money;
+  }
 
   // =========================================
   // PROWIZJE
@@ -635,43 +672,92 @@ module.exports = (client) => {
   }
 
   function createExchangeModal() {
+    const methods = [
+      "BLIK",
+      "KODBLIK",
+      "PAYPAL",
+      "LTC",
+      "BTC",
+      "ETH",
+      "SOL",
+      "USDT",
+      "CRYPTO",
+      "PSC",
+      "SKRILL",
+      "VINTED",
+      "ZEN"
+    ];
+
+    const methodOptions = methods.map(value => ({
+      label: displayExchangeMethod(value),
+      value,
+      emoji: componentEmoji(selectEmojiForMethod(value))
+    }));
+
+    const amountLabel = new LabelBuilder()
+      .setLabel("JAKA KWOTA")
+      .setDescription("Podaj kwotę wymiany, np. 48")
+      .setTextInputComponent(
+        new TextInputBuilder()
+          .setCustomId("exchange_amount")
+          .setStyle(TextInputStyle.Short)
+          .setPlaceholder("Np. 48")
+          .setMinLength(1)
+          .setMaxLength(20)
+          .setRequired(true)
+      );
+
+    const fromLabel = new LabelBuilder()
+      .setLabel("Z CZEGO")
+      .setDescription("Wybierz metodę, którą posiadasz")
+      .setStringSelectMenuComponent(
+        new StringSelectMenuBuilder()
+          .setCustomId("exchange_from")
+          .setPlaceholder("Wybierz metodę źródłową")
+          .setMinValues(1)
+          .setMaxValues(1)
+          .setRequired(true)
+          .addOptions(methodOptions)
+      );
+
+    const toLabel = new LabelBuilder()
+      .setLabel("NA CO")
+      .setDescription("Wybierz metodę, którą chcesz otrzymać")
+      .setStringSelectMenuComponent(
+        new StringSelectMenuBuilder()
+          .setCustomId("exchange_to")
+          .setPlaceholder("Wybierz metodę docelową")
+          .setMinValues(1)
+          .setMaxValues(1)
+          .setRequired(true)
+          .addOptions(methodOptions)
+      );
+
+    const currencyLabel = new LabelBuilder()
+      .setLabel("WALUTA")
+      .setDescription("Wybierz walutę podanej kwoty")
+      .setStringSelectMenuComponent(
+        new StringSelectMenuBuilder()
+          .setCustomId("exchange_currency")
+          .setPlaceholder("Wybierz walutę")
+          .setMinValues(1)
+          .setMaxValues(1)
+          .setRequired(true)
+          .addOptions(
+            { label: "PLN", value: "PLN", emoji: { name: "🇵🇱" }, default: true },
+            { label: "EUR", value: "EUR", emoji: { name: "🇪🇺" } },
+            { label: "USD", value: "USD", emoji: { name: "🇺🇸" } }
+          )
+      );
+
     return new ModalBuilder()
       .setCustomId("exchange_full_modal")
       .setTitle("Formularz wymiany")
-      .addComponents(
-        new ActionRowBuilder().addComponents(
-          new TextInputBuilder()
-            .setCustomId("exchange_amount")
-            .setLabel("JAKA KWOTA")
-            .setStyle(TextInputStyle.Short)
-            .setPlaceholder("Np. 48")
-            .setRequired(true)
-        ),
-        new ActionRowBuilder().addComponents(
-          new TextInputBuilder()
-            .setCustomId("exchange_from")
-            .setLabel("Z CZEGO")
-            .setStyle(TextInputStyle.Short)
-            .setPlaceholder("BLIK / KOD BLIK / PAYPAL / LTC / BTC / ETH / SOL")
-            .setRequired(true)
-        ),
-        new ActionRowBuilder().addComponents(
-          new TextInputBuilder()
-            .setCustomId("exchange_to")
-            .setLabel("NA CO")
-            .setStyle(TextInputStyle.Short)
-            .setPlaceholder("BLIK / KOD BLIK / PAYPAL / LTC / BTC / ETH / SOL")
-            .setRequired(true)
-        ),
-        new ActionRowBuilder().addComponents(
-          new TextInputBuilder()
-            .setCustomId("exchange_currency")
-            .setLabel("WALUTA (PLN / EUR / USD)")
-            .setStyle(TextInputStyle.Short)
-            .setPlaceholder("PLN")
-            .setValue("PLN")
-            .setRequired(true)
-        )
+      .addLabelComponents(
+        amountLabel,
+        fromLabel,
+        toLabel,
+        currencyLabel
       );
   }
 
@@ -1135,13 +1221,14 @@ module.exports = (client) => {
         .trim()
         .replace(",", ".");
       const from = normalizeExchangeMethod(
-        interaction.fields.getTextInputValue("exchange_from")
+        interaction.fields.getStringSelectValues("exchange_from")[0]
       );
       const to = normalizeExchangeMethod(
-        interaction.fields.getTextInputValue("exchange_to")
+        interaction.fields.getStringSelectValues("exchange_to")[0]
       );
-      const currencyRaw = interaction.fields
-        .getTextInputValue("exchange_currency")
+      const currencyRaw = String(
+        interaction.fields.getStringSelectValues("exchange_currency")[0] || ""
+      )
         .trim()
         .toUpperCase();
       const currency = ["PLN", "EUR", "USD"].includes(currencyRaw)
