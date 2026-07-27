@@ -9,9 +9,7 @@ const {
   ButtonStyle,
   ModalBuilder,
   TextInputBuilder,
-  TextInputStyle,
-  LabelBuilder,
-  StringSelectMenuOptionBuilder
+  TextInputStyle
 } = require("discord.js");
 const { upsertPanel } = require("./panelManager");
 const store = require("./dataStore");
@@ -572,60 +570,6 @@ module.exports = (client) => {
   }
 
 
-  function exchangeMethodOptions() {
-    return [
-      new StringSelectMenuOptionBuilder()
-        .setLabel("BLIK")
-        .setValue("BLIK")
-        .setEmoji({ id: "1499784231608389742" }),
-      new StringSelectMenuOptionBuilder()
-        .setLabel("KOD BLIK")
-        .setValue("KODBLIK")
-        .setEmoji({ id: "1499784231608389742" }),
-      new StringSelectMenuOptionBuilder()
-        .setLabel("PAYPAL")
-        .setValue("PAYPAL")
-        .setEmoji({ id: "1499784258091483236" }),
-      new StringSelectMenuOptionBuilder()
-        .setLabel("LTC")
-        .setValue("LTC")
-        .setEmoji({ id: "1499784285211726014" }),
-      new StringSelectMenuOptionBuilder().setLabel("BTC").setValue("BTC").setEmoji("₿"),
-      new StringSelectMenuOptionBuilder().setLabel("ETH").setValue("ETH").setEmoji("◆"),
-      new StringSelectMenuOptionBuilder().setLabel("SOL").setValue("SOL").setEmoji("◎"),
-      new StringSelectMenuOptionBuilder().setLabel("USDT").setValue("USDT").setEmoji("💵"),
-      new StringSelectMenuOptionBuilder()
-        .setLabel("CRYPTO")
-        .setValue("CRYPTO")
-        .setEmoji({ id: "1499784635201224724" }),
-      new StringSelectMenuOptionBuilder()
-        .setLabel("PSC")
-        .setValue("PSC")
-        .setEmoji({ id: "1519440223140970636", name: "MYPSC" }),
-      new StringSelectMenuOptionBuilder()
-        .setLabel("SKRILL")
-        .setValue("SKRILL")
-        .setEmoji({ id: "1519440276492521472", name: "SKRILL" })
-    ];
-  }
-
-  function currencyOptions() {
-    return [
-      new StringSelectMenuOptionBuilder()
-        .setLabel("PLN")
-        .setValue("PLN")
-        .setEmoji("🇵🇱"),
-      new StringSelectMenuOptionBuilder()
-        .setLabel("EUR")
-        .setValue("EUR")
-        .setEmoji("🇪🇺"),
-      new StringSelectMenuOptionBuilder()
-        .setLabel("USD")
-        .setValue("USD")
-        .setEmoji("🇺🇸")
-    ];
-  }
-
   function normalizeExchangeMethod(value) {
     const v = String(value || "").trim().toUpperCase().replace(/\s+/g, "");
     if (["BLIK", "KODBLIK", "PAYPAL", "LTC", "BTC", "ETH", "SOL", "USDT", "CRYPTO", "PSC", "SKRILL", "VINTED", "ZEN"].includes(v)) return v;
@@ -690,13 +634,6 @@ module.exports = (client) => {
     };
   }
 
-  function getModalSelectValue(fields, customId) {
-    const field = fields?.fields?.get(customId) || fields?.getField?.(customId);
-    if (Array.isArray(field?.values) && field.values.length) return field.values[0];
-    if (typeof field?.value === "string") return field.value;
-    return "";
-  }
-
   function createExchangeModal() {
     const modal = new ModalBuilder()
       .setCustomId("exchange_full_modal")
@@ -704,49 +641,41 @@ module.exports = (client) => {
 
     const amountInput = new TextInputBuilder()
       .setCustomId("exchange_amount")
+      .setLabel("JAKA KWOTA")
       .setStyle(TextInputStyle.Short)
       .setPlaceholder("Np. 48")
       .setRequired(true);
 
-    const amountLabel = new LabelBuilder()
-      .setLabel("JAKA KWOTA.")
-      .setTextInputComponent(amountInput);
-
-    const fromSelect = new StringSelectMenuBuilder()
+    const fromInput = new TextInputBuilder()
       .setCustomId("exchange_from")
-      .setPlaceholder("× Nie wybrałeś/aś żadnej opcji.")
-      .setRequired(true)
-      .addOptions(exchangeMethodOptions());
+      .setLabel("Z CZEGO")
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder("BLIK / PAYPAL / LTC / BTC / ETH / SOL")
+      .setRequired(true);
 
-    const fromLabel = new LabelBuilder()
-      .setLabel("Z CZEGO:")
-      .setStringSelectMenuComponent(fromSelect);
-
-    const toSelect = new StringSelectMenuBuilder()
+    const toInput = new TextInputBuilder()
       .setCustomId("exchange_to")
-      .setPlaceholder("× Nie wybrałeś/aś żadnej opcji.")
-      .setRequired(true)
-      .addOptions(exchangeMethodOptions());
+      .setLabel("NA CO")
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder("BLIK / PAYPAL / LTC / BTC / ETH / SOL")
+      .setRequired(true);
 
-    const toLabel = new LabelBuilder()
-      .setLabel("NA CO:")
-      .setStringSelectMenuComponent(toSelect);
-
-    const currencySelect = new StringSelectMenuBuilder()
+    const currencyInput = new TextInputBuilder()
       .setCustomId("exchange_currency")
+      .setLabel("WALUTA (PLN / EUR / USD)")
+      .setStyle(TextInputStyle.Short)
       .setPlaceholder("PLN")
-      .setRequired(true)
-      .addOptions(currencyOptions());
+      .setValue("PLN")
+      .setRequired(true);
 
-    const currencyLabel = new LabelBuilder()
-      .setLabel("JAKĄ WALUTĘ POSIADASZ:")
-      .setStringSelectMenuComponent(currencySelect);
-
-    return modal.addLabelComponents(
-      amountLabel,
-      fromLabel,
-      toLabel,
-      currencyLabel
+    // Klasyczne wiersze z polami tekstowymi działają na wszystkich klientach
+    // Discorda. Select menu osadzone w Label (component type 18) powodowało,
+    // że Discord odrzucał modal i wyświetlał „aplikacja nie odpowiedziała”.
+    return modal.addComponents(
+      new ActionRowBuilder().addComponents(amountInput),
+      new ActionRowBuilder().addComponents(fromInput),
+      new ActionRowBuilder().addComponents(toInput),
+      new ActionRowBuilder().addComponents(currencyInput)
     );
   }
 
@@ -1197,9 +1126,9 @@ module.exports = (client) => {
     // =========================
     if (interaction.isModalSubmit() && interaction.customId === "exchange_full_modal") {
       const amount = interaction.fields.getTextInputValue("exchange_amount");
-      const from = normalizeExchangeMethod(getModalSelectValue(interaction.fields, "exchange_from"));
-      const to = normalizeExchangeMethod(getModalSelectValue(interaction.fields, "exchange_to"));
-      const currency = normalizeCurrency(getModalSelectValue(interaction.fields, "exchange_currency"));
+      const from = normalizeExchangeMethod(interaction.fields.getTextInputValue("exchange_from"));
+      const to = normalizeExchangeMethod(interaction.fields.getTextInputValue("exchange_to"));
+      const currency = normalizeCurrency(interaction.fields.getTextInputValue("exchange_currency"));
 
       if (!amount || isNaN(amount)) {
         return interaction.reply({
