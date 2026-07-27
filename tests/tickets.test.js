@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { EventEmitter } = require("node:events");
-const { Collection, Events } = require("discord.js");
+const { Collection, ComponentType, Events } = require("discord.js");
 
 function createClient() {
   const client = new EventEmitter();
@@ -29,8 +29,13 @@ test("menu wymiany odpowiada modalem", async () => {
 
   assert.equal(modal.custom_id, "exchange_full_modal");
   assert.equal(modal.components.length, 4);
-  assert.deepEqual(modal.components.map(row => row.type), [1, 1, 1, 1]);
-  assert.deepEqual(modal.components.map(row => row.components[0].type), [4, 4, 4, 4]);
+  // Zachowujemy te asercje z gałęzi naprawczej: gwarantują, że modal nie
+  // wróci przypadkiem do niekompatybilnych komponentów Label/select menu.
+  assert.ok(modal.components.every(row => row.type === ComponentType.ActionRow));
+  assert.ok(modal.components.every(row =>
+    row.components.length === 1 &&
+    row.components[0].type === ComponentType.TextInput
+  ));
 });
 
 test("błąd menu zawsze otrzymuje odpowiedź zamiast przekroczenia czasu", async () => {
