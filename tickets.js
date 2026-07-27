@@ -9,7 +9,8 @@ const {
   ButtonStyle,
   ModalBuilder,
   TextInputBuilder,
-  TextInputStyle
+  TextInputStyle,
+  StringSelectMenuOptionBuilder
 } = require("discord.js");
 const { upsertPanel } = require("./panelManager");
 const store = require("./dataStore");
@@ -58,6 +59,7 @@ module.exports = (client) => {
   const pendingLegitTickets = new Map(); // clientId -> ticketChannelId
   const pendingPaymentData = new Map(); // channelId:userId -> dane z /dane
   const autoLegitSent = new Set(); // channelId - ochrona przed podwójnym wysłaniem
+  const pendingExchanges = new Map();
 
   function getUserStats(userId) {
     if (!userStats.has(userId)) userStats.set(userId, { exchanges: 8, total: 369 });
@@ -634,10 +636,10 @@ module.exports = (client) => {
     };
   }
 
-  function createExchangeModal() {
+  function createExchangeAmountModal() {
     const modal = new ModalBuilder()
-      .setCustomId("exchange_full_modal")
-      .setTitle("Potrzebne informacje.");
+      .setCustomId("exchange_amount_modal")
+      .setTitle("Kwota wymiany");
 
     const amountInput = new TextInputBuilder()
       .setCustomId("exchange_amount")
@@ -646,37 +648,27 @@ module.exports = (client) => {
       .setPlaceholder("Np. 48")
       .setRequired(true);
 
-    const fromInput = new TextInputBuilder()
-      .setCustomId("exchange_from")
-      .setLabel("Z CZEGO")
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder("BLIK / PAYPAL / LTC / BTC / ETH / SOL")
-      .setRequired(true);
+    return modal.addComponents(new ActionRowBuilder().addComponents(amountInput));
+  }
 
-    const toInput = new TextInputBuilder()
-      .setCustomId("exchange_to")
-      .setLabel("NA CO")
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder("BLIK / PAYPAL / LTC / BTC / ETH / SOL")
-      .setRequired(true);
-
-    const currencyInput = new TextInputBuilder()
-      .setCustomId("exchange_currency")
-      .setLabel("WALUTA (PLN / EUR / USD)")
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder("PLN")
-      .setValue("PLN")
-      .setRequired(true);
-
-    // Klasyczne wiersze z polami tekstowymi działają na wszystkich klientach
-    // Discorda. Select menu osadzone w Label (component type 18) powodowało,
-    // że Discord odrzucał modal i wyświetlał „aplikacja nie odpowiedziała”.
-    return modal.addComponents(
-      new ActionRowBuilder().addComponents(amountInput),
-      new ActionRowBuilder().addComponents(fromInput),
-      new ActionRowBuilder().addComponents(toInput),
-      new ActionRowBuilder().addComponents(currencyInput)
-    );
+  function exchangeChoiceRows(selection = {}) {
+    const methods = [
+      ["BLIK", EMOJI.blik], ["KODBLIK", EMOJI.kodblik], ["PAYPAL", EMOJI.paypal],
+      ["LTC", EMOJI.ltc], ["BTC", "₿"], ["ETH", "◆"], ["SOL", "◎"],
+      ["USDT", "💵"], ["CRYPTO", EMOJI.crypto], ["PSC", EMOJI.psc], ["SKRILL", EMOJI.skrill]
+    ];
+    const currencies = [["PLN", "🇵🇱"], ["EUR", "🇪🇺"], ["USD", "🇺🇸"]];
+    const menu = (id, placeholder, values, selected) => new StringSelectMenuBuilder()
+      .setCustomId(id).setPlaceholder(selected || placeholder).addOptions(values.map(([value, emoji]) => {
+        const option = new StringSelectMenuOptionBuilder().setLabel(value).setValue(value).setEmoji(emoji);
+        if (value === selected) option.setDefault(true);
+        return option;
+      }));
+    return [
+      new ActionRowBuilder().addComponents(menu("exchange_from_select", "Z czego?", methods, selection.from)),
+      new ActionRowBuilder().addComponents(menu("exchange_to_select", "Na co?", methods, selection.to)),
+      new ActionRowBuilder().addComponents(menu("exchange_currency_select", "Waluta", currencies, selection.currency))
+    ];
   }
 
   function isCryptoMethod(value) {
@@ -872,6 +864,20 @@ module.exports = (client) => {
     try {
 
     // =========================
+    // WYBÓR DANYCH WYMIANY
+    // =========================
+    if (interaction.isStringSelectMenu() && interaction.customId.endsWith("_select") && interaction.customId.startsWith("exchange_")) {
+      const selection = pendingExchanges.get(interaction.user.id) || {};
+      const key = { exchange_from_select: "from", exchange_to_select: "to", exchange_currency_select: "currency" }[interaction.customId];
+      selection[key] = interaction.values[0];
+      pendingExchanges.set(interaction.user.id, selection);
+      if (selection.from && selection.to && selection.currency) {
+        return interaction.showModal(createExchangeAmountModal());
+      }
+      return interaction.update({ components: exchangeChoiceRows(selection) });
+    }
+
+    // =========================
     // MENU
     // =========================
     if (
@@ -899,7 +905,12 @@ module.exports = (client) => {
       // EXCHANGE
       // =====================================
       if (type === "exchange") {
-        return interaction.showModal(createExchangeModal());
+        pendingExchanges.set(interaction.user.id, {});
+        return interaction.reply({
+          content: `${EMOJI.money} Wybierz metody wymiany i walutę:`,
+          components: exchangeChoiceRows(),
+          ephemeral: true
+        });
       }
 
       if (type === "middleman") {
@@ -1124,11 +1135,13 @@ module.exports = (client) => {
     // =========================
     // EXCHANGE MODAL SUBMIT
     // =========================
-    if (interaction.isModalSubmit() && interaction.customId === "exchange_full_modal") {
+    if (interaction.isModalSubmit() && interaction.customId === "exchange_amount_modal") {
       const amount = interaction.fields.getTextInputValue("exchange_amount");
-      const from = normalizeExchangeMethod(interaction.fields.getTextInputValue("exchange_from"));
-      const to = normalizeExchangeMethod(interaction.fields.getTextInputValue("exchange_to"));
-      const currency = normalizeCurrency(interaction.fields.getTextInputValue("exchange_currency"));
+      const selection = pendingExchanges.get(interaction.user.id) || {};
+      pendingExchanges.delete(interaction.user.id);
+      const from = normalizeExchangeMethod(selection.from);
+      const to = normalizeExchangeMethod(selection.to);
+      const currency = normalizeCurrency(selection.currency);
 
       if (!amount || isNaN(amount)) {
         return interaction.reply({
