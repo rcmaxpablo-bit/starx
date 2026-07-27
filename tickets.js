@@ -56,21 +56,6 @@ module.exports = (client) => {
   // =========================================
   const exchangeData = new Map();
   const claimedTickets = new Map();
-  const userStats = new Map();
-  const pendingLegitTickets = new Map(); // clientId -> ticketChannelId
-
-  function getUserStats(userId) {
-    if (!userStats.has(userId)) userStats.set(userId, { exchanges: 8, total: 369 });
-    return userStats.get(userId);
-  }
-
-  function addUserExchange(userId, amount) {
-    const stats = getUserStats(userId);
-    stats.exchanges += 1;
-    stats.total += Number(amount) || 0;
-    userStats.set(userId, stats);
-    return stats;
-  }
 
   function formatMoney(value) {
     return `${Number(value || 0).toFixed(2)} PLN`;
@@ -78,19 +63,6 @@ module.exports = (client) => {
 
   function formatCurrency(value, currency = "PLN") {
     return `${Number(value || 0).toFixed(2)} ${String(currency || "PLN").toUpperCase()}`;
-  }
-
-  function saveCustomerTransaction(interaction, { clientId, amount, type, description, currency = "PLN" }) {
-    if (!clientId) return null;
-    return store.recordTransaction({
-      userId: clientId,
-      amount,
-      type,
-      description,
-      currency,
-      channelId: interaction.channel.id,
-      moderatorId: interaction.user.id
-    });
   }
 
   function cleanTicketName(name) {
@@ -111,13 +83,6 @@ module.exports = (client) => {
   function lockTicketName(currentName) {
     const clean = cleanTicketName(currentName).replace(/^unlock-/, "").replace(/^lock-/, "");
     return `lock-${clean}`;
-  }
-
-  async function giveClientRoleById(guild, userId) {
-    if (!guild || !userId) return;
-    const member = await guild.members.fetch(userId).catch(() => null);
-    if (!member) return;
-    await member.roles.add(CLIENT_ROLE_ID).catch(() => {});
   }
 
   let legitRenameTimer = null;
@@ -310,7 +275,7 @@ module.exports = (client) => {
       new ButtonBuilder()
         .setCustomId(isClaimed ? "unclaim_ticket" : "claim_ticket")
         .setLabel(isClaimed ? "Oddaj Ticket" : "Przejmij Ticket")
-        .setEmoji(componentEmoji(isClaimed ? EMOJI.unlock : EMOJI.lock, isClaimed ? "🔓" : "🔒"))
+        .setEmoji(componentEmoji(isClaimed ? EMOJI.unlock : EMOJI.ticket, isClaimed ? "🔓" : "🎫"))
         .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
         .setCustomId("ticket_settings")
@@ -320,12 +285,12 @@ module.exports = (client) => {
       new ButtonBuilder()
         .setCustomId("close_ticket")
         .setLabel("Zamknij / Wykonane")
-        .setEmoji("✅")
+        .setEmoji(componentEmoji(EMOJI.lock, "🔒"))
         .setStyle(ButtonStyle.Danger),
       new ButtonBuilder()
         .setCustomId("send_legit_check")
         .setLabel("Legit Check")
-        .setEmoji("📣")
+        .setEmoji(componentEmoji(EMOJI.zap, "⚡"))
         .setStyle(ButtonStyle.Success)
     );
   }
@@ -751,7 +716,7 @@ module.exports = (client) => {
       .setCustomId("exchange_currency")
       .setPlaceholder("PLN")
       .setRequired(true)
-      .addOptions(currencyOptions());
+      .addOptions(currencyOptions("PLN"));
 
     const currencyLabel = new LabelBuilder()
       .setLabel("JAKĄ WALUTĘ POSIADASZ:")
@@ -1494,17 +1459,8 @@ module.exports = (client) => {
       const amountText = Number.isFinite(amountNumber) ? `${amountNumber.toFixed(0)}PLN` : `${amountRaw}PLN`;
       const legitText = `+rep ${interaction.user} Purchased ${item} ${amountText} [${method}]`;
 
-      saveCustomerTransaction(interaction, {
-        clientId,
-        amount: amountNumber,
-        type: "purchase",
-        description: `Zakup: ${item}`
-      });
-
-      if (clientId) {
-        await giveClientRoleById(interaction.guild, clientId);
-        pendingLegitTickets.set(clientId, interaction.channel.id);
-      }
+      // Statystyki, historia i rola Klient są aktualizowane dopiero po
+      // faktycznym wysłaniu przez klienta wiadomości +rep na kanale LC.
 
       await interaction.reply({
         content: clientId ? `<@${clientId}>` : undefined,
@@ -1567,17 +1523,8 @@ module.exports = (client) => {
       const amountText = Number.isFinite(amountNumber) ? `${amountNumber.toFixed(0)}PLN` : `${amountRaw}PLN`;
       const legitText = `+rep <@${claimedUserId}> Middleman ${amountText}`;
 
-      saveCustomerTransaction(interaction, {
-        clientId,
-        amount: amountNumber,
-        type: "middleman",
-        description: "Usługa Middleman"
-      });
-
-      if (clientId) {
-        await giveClientRoleById(interaction.guild, clientId);
-        pendingLegitTickets.set(clientId, interaction.channel.id);
-      }
+      // Statystyki, historia i rola Klient są aktualizowane dopiero po
+      // faktycznym wysłaniu przez klienta wiadomości +rep na kanale LC.
 
       await interaction.reply({
         content: clientId ? `<@${clientId}>` : undefined,
@@ -1655,18 +1602,8 @@ module.exports = (client) => {
       const fromTo = `${displayExchangeMethod(exchangeInfo.from)} TO ${displayExchangeMethod(exchangeInfo.to)}`;
       const legitText = `+rep ${interaction.user} Exchanged ${fromTo} ${formatCurrency(amount, exchangeInfo.currency)}`;
 
-      saveCustomerTransaction(interaction, {
-        clientId,
-        amount: Number(amount),
-        type: "exchange",
-        description: `Wymiana ${fromTo}`,
-        currency: exchangeInfo.currency
-      });
-
-      if (clientId) {
-        await giveClientRoleById(interaction.guild, clientId);
-        pendingLegitTickets.set(clientId, interaction.channel.id);
-      }
+      // Statystyki, historia i rola Klient są aktualizowane dopiero po
+      // faktycznym wysłaniu przez klienta wiadomości +rep na kanale LC.
 
       await interaction.reply({
         content: clientId ? `<@${clientId}>` : undefined,

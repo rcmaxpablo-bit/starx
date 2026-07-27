@@ -325,11 +325,19 @@ ${EMOJI.arrow} **Wklej na <#${REP_CHANNEL_ID}>**`
             if (!/^\+rep(?:\s|$)/i.test(String(message.content || "").trim())) return;
 
             const guild = message.guild;
-            // Dostęp zabieramy autorowi +rep (klientowi), a nie oznaczonemu sprzedawcy.
+            // Autorem +rep jest klient. Dopiero teraz nadajemy rolę Klient,
+            // zapisujemy transakcję w Panelu Klienta i zamykamy mu dostęp do ticketa.
             const clientId = message.author.id;
+            const member = message.member || await guild.members.fetch(clientId).catch(() => null);
+
+            if (member && !member.roles.cache.has(CLIENT_ROLE_ID)) {
+                await member.roles.add(CLIENT_ROLE_ID, "Klient wystawił legit check +rep").catch(err => {
+                    console.log("CLIENT ROLE ERROR:", err?.message || err);
+                });
+            }
 
             const ticket = guild.channels.cache.find(c =>
-                c.topic?.startsWith(clientId)
+                c.topic?.startsWith(`${clientId}:`)
             );
 
             if (!ticket) return;

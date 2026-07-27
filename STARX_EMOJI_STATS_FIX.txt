@@ -1,0 +1,21 @@
+STARX EXCHANGE — poprawki ticketów i statystyk
+
+1. Przyciski ticketa używają niestandardowych emoji StarX:
+   - Przejmij/Oddaj Ticket
+   - Ustawienia Ticketa
+   - Zamknij / Wykonane
+   - Legit Check
+
+2. Formularz wymiany ma domyślnie zaznaczoną walutę PLN.
+
+3. Kliknięcie „Legit Check” NIE zapisuje już transakcji, nie zwiększa statystyk
+   i nie nadaje roli Klient.
+
+4. Transakcja oraz statystyki Panelu Klienta są aktualizowane dopiero po
+   faktycznym wysłaniu przez klienta wiadomości +rep na kanale legit-check.
+
+5. Historia Panelu Klienta pokazuje tylko potwierdzone transakcje.
+
+6. Rola Klient jest nadawana dopiero po wysłaniu +rep.
+
+Testy: 16/16 zaliczone.
