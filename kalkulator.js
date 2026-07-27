@@ -26,23 +26,33 @@ module.exports = async (client) => {
     BLIK: [
       `${EMOJI.blik} **BLIK** -> ${EMOJI.paypal} **PAYPAL** - Prowizja wynosi: **2%**`,
       `${EMOJI.blik} **BLIK** -> ${EMOJI.crypto} **CRYPTO** - Prowizja wynosi: **8%**`,
+      `${EMOJI.blik} **BLIK** -> ${EMOJI.ltc} **LTC** - Prowizja wynosi: **8%**`,
       `${EMOJI.blik} **BLIK** -> ${EMOJI.skrill} **SKRILL** - Prowizja wynosi: **2%**`
     ],
     KODBLIK: [
       `${EMOJI.blik} **KOD BLIK** -> ${EMOJI.paypal} **PAYPAL** - Prowizja wynosi: **6%**`,
       `${EMOJI.blik} **KOD BLIK** -> ${EMOJI.crypto} **CRYPTO** - Prowizja wynosi: **11%**`,
+      `${EMOJI.blik} **KOD BLIK** -> ${EMOJI.ltc} **LTC** - Prowizja wynosi: **11%**`,
       `${EMOJI.blik} **KOD BLIK** -> ${EMOJI.skrill} **SKRILL** - Prowizja wynosi: **6%**`
+    ],
+    LTC: [
+      `${EMOJI.ltc} **LTC** -> ${EMOJI.blik} **BLIK** - Prowizja wynosi: **4%**`,
+      `${EMOJI.ltc} **LTC** -> ${EMOJI.blik} **KOD BLIK** - Prowizja wynosi: **4%**`,
+      `${EMOJI.ltc} **LTC** -> ${EMOJI.paypal} **PAYPAL** - Prowizja wynosi: **4%**`,
+      `${EMOJI.ltc} **LTC** -> ${EMOJI.crypto} **CRYPTO** - Prowizja wynosi: **4%**`
     ],
     PSC: [
       `${EMOJI.psc} **PSC** -> ${EMOJI.blik} **BLIK** - Prowizja wynosi: **11%**`,
       `${EMOJI.psc} **PSC** -> ${EMOJI.blik} **KOD BLIK** - Prowizja wynosi: **11%**`,
       `${EMOJI.psc} **PSC** -> ${EMOJI.paypal} **PAYPAL** - Prowizja wynosi: **11%**`,
       `${EMOJI.psc} **PSC** -> ${EMOJI.crypto} **CRYPTO** - Prowizja wynosi: **13%**`,
+      `${EMOJI.psc} **PSC** -> ${EMOJI.ltc} **LTC** - Prowizja wynosi: **13%**`,
       `${EMOJI.psc} **PSC** -> ${EMOJI.skrill} **SKRILL** - Prowizja wynosi: **11%**`
     ],
     PAYPAL: [
       `${EMOJI.paypal} **PAYPAL** -> ${EMOJI.blik} **BLIK** - Prowizja wynosi: **9%**`,
       `${EMOJI.paypal} **PAYPAL** -> ${EMOJI.crypto} **CRYPTO** - Prowizja wynosi: **9%**`,
+      `${EMOJI.paypal} **PAYPAL** -> ${EMOJI.ltc} **LTC** - Prowizja wynosi: **9%**`,
       `${EMOJI.paypal} **PAYPAL** -> ${EMOJI.skrill} **SKRILL** - Prowizja wynosi: **9%**`
     ],
     CRYPTO: [
@@ -50,6 +60,7 @@ module.exports = async (client) => {
       `${EMOJI.crypto} **CRYPTO** -> ${EMOJI.blik} **KOD BLIK** - Prowizja wynosi: **4%**`,
       `${EMOJI.crypto} **CRYPTO** -> ${EMOJI.paypal} **PAYPAL** - Prowizja wynosi: **4%**`,
       `${EMOJI.crypto} **CRYPTO** -> ${EMOJI.crypto} **CRYPTO** - Prowizja wynosi: **4%**`,
+      `${EMOJI.crypto} **CRYPTO** -> ${EMOJI.ltc} **LTC** - Prowizja wynosi: **4%**`,
       `${EMOJI.crypto} **CRYPTO** -> ${EMOJI.skrill} **SKRILL** - Prowizja wynosi: **4%**`
     ],
     SKRILL: [
@@ -57,6 +68,7 @@ module.exports = async (client) => {
       `${EMOJI.skrill} **SKRILL** -> ${EMOJI.blik} **KOD BLIK** - Prowizja wynosi: **9%**`,
       `${EMOJI.skrill} **SKRILL** -> ${EMOJI.paypal} **PAYPAL** - Prowizja wynosi: **9%**`,
       `${EMOJI.skrill} **SKRILL** -> ${EMOJI.crypto} **CRYPTO** - Prowizja wynosi: **9%**`,
+      `${EMOJI.skrill} **SKRILL** -> ${EMOJI.ltc} **LTC** - Prowizja wynosi: **9%**`
     ]
   };
 
@@ -64,6 +76,7 @@ module.exports = async (client) => {
     return [
       { label: "BLIK", value: "BLIK", emoji: { id: "1499784231608389742", name: "blik" } },
       { label: "KOD BLIK", value: "KODBLIK", emoji: { id: "1499784231608389742", name: "blik" } },
+      { label: "LTC", value: "LTC", emoji: { id: "1499784285211726014", name: "ltc" } },
       { label: "PSC", value: "PSC", emoji: { id: "1519440223140970636", name: "MYPSC" } },
       { label: "PAYPAL", value: "PAYPAL", emoji: { id: "1499784258091483236", name: "paypal" } },
       { label: "CRYPTO", value: "CRYPTO", emoji: { id: "1499784635201224724", name: "crypto" } },

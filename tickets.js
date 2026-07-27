@@ -8,9 +8,10 @@ const {
   ButtonBuilder,
   ButtonStyle,
   ModalBuilder,
-  LabelBuilder,
   TextInputBuilder,
-  TextInputStyle
+  TextInputStyle,
+  LabelBuilder,
+  StringSelectMenuOptionBuilder
 } = require("discord.js");
 const { upsertPanel } = require("./panelManager");
 const store = require("./dataStore");
@@ -50,28 +51,6 @@ module.exports = (client) => {
   // =========================================
   const EMBED_COLOR = "#1b2dff";
 
-  // Metody dostępne we wszystkich formularzach i listach wyboru.
-  const AVAILABLE_METHODS = Object.freeze([
-    "BLIK",
-    "KODBLIK",
-    "LTC",
-    "PSC",
-    "PAYPAL",
-    "CRYPTO",
-    "SKRILL"
-  ]);
-
-  // Ustawienia obsługują również istniejące tickety LTC.
-  const SETTINGS_METHODS = Object.freeze([
-    "BLIK",
-    "KODBLIK",
-    "LTC",
-    "PSC",
-    "PAYPAL",
-    "CRYPTO",
-    "SKRILL"
-  ]);
-
   // =========================================
   // TEMP DATA
   // =========================================
@@ -79,8 +58,6 @@ module.exports = (client) => {
   const claimedTickets = new Map();
   const userStats = new Map();
   const pendingLegitTickets = new Map(); // clientId -> ticketChannelId
-  const pendingPaymentData = new Map(); // channelId:userId -> dane z /dane
-  const autoLegitSent = new Set(); // channelId - ochrona przed podwójnym wysłaniem
 
   function getUserStats(userId) {
     if (!userStats.has(userId)) userStats.set(userId, { exchanges: 8, total: 369 });
@@ -325,70 +302,51 @@ module.exports = (client) => {
   function ticketButtons(isClaimed = false) {
     return new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setCustomId(isClaimed ? "unclaim_ticket" : "claim_ticket")
-        .setLabel(isClaimed ? "Odprzejmij Ticket" : "Przejmij Ticket")
-        .setEmoji(componentEmoji(isClaimed ? EMOJI.unlock : EMOJI.lock))
-        .setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder()
-        .setCustomId("ticket_settings")
-        .setLabel("Ustawienia Ticketa")
-        .setEmoji(componentEmoji(EMOJI.setting))
-        .setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder()
         .setCustomId("close_ticket")
-        .setLabel("Zamknij/Wykonane")
-        .setEmoji(componentEmoji(EMOJI.warning))
+        .setEmoji({ id: "1499784378992295956", animated: true })
         .setStyle(ButtonStyle.Danger),
       new ButtonBuilder()
+        .setCustomId(isClaimed ? "unclaim_ticket" : "claim_ticket")
+        .setEmoji(isClaimed ? { id: "1510596058470809690" } : { id: "1501697222901895258" })
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
         .setCustomId("send_legit_check")
-        .setLabel("Legit Check")
-        .setEmoji(componentEmoji(EMOJI.pin))
+        .setEmoji({ id: "1499784353012514917", animated: true })
         .setStyle(ButtonStyle.Success)
     );
   }
 
 
-
   function createPurchaseLegitModal() {
-    const itemLabel = new LabelBuilder()
-      .setLabel("CO KUPIŁ KLIENT?")
-      .setDescription("Wpisz nazwę produktu lub usługi")
-      .setTextInputComponent(
-        new TextInputBuilder()
-          .setCustomId("purchase_item")
-          .setPlaceholder("Np. YT Premium FA [LIFETIME]")
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-      );
-
-    const amountLabel = new LabelBuilder()
-      .setLabel("KWOTA")
-      .setDescription("Podaj kwotę zakupu w PLN")
-      .setTextInputComponent(
-        new TextInputBuilder()
-          .setCustomId("purchase_amount")
-          .setPlaceholder("Np. 24")
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-      );
-
-    const methodLabel = new LabelBuilder()
-      .setLabel("METODA PŁATNOŚCI")
-      .setDescription("Wybierz metodę z listy")
-      .setStringSelectMenuComponent(
-        new StringSelectMenuBuilder()
-          .setCustomId("purchase_method")
-          .setPlaceholder("Wybierz metodę płatności")
-          .setMinValues(1)
-          .setMaxValues(1)
-          .setRequired(true)
-          .addOptions(createMethodOptions())
-      );
-
     return new ModalBuilder()
       .setCustomId("purchase_legit_modal")
       .setTitle("Legit check zakupu")
-      .addLabelComponents(itemLabel, amountLabel, methodLabel);
+      .addComponents(
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId("purchase_item")
+            .setLabel("Co kupił klient?")
+            .setPlaceholder("Np. YT Premium FA [LIFETIME]")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+        ),
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId("purchase_amount")
+            .setLabel("Kwota")
+            .setPlaceholder("Np. 24")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+        ),
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId("purchase_method")
+            .setLabel("Metoda płatności")
+            .setPlaceholder("Np. PSC / BLIK / PAYPAL / LTC")
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+        )
+      );
   }
 
   function parseUserId(value) {
@@ -446,7 +404,6 @@ module.exports = (client) => {
     admin: "<:ADM:1501989271077388500>",
     list: "<:LIST:1501693215328440370>",
     clock: "<:CZAS:1502030015943151868>",
-    setting: "<:ustawienia:1531392301837062215>",
 
     // =========================
     // MONEY / ANIMOWANE
@@ -502,54 +459,11 @@ module.exports = (client) => {
     prime: "<:primevideo:1502001410311716984>"
   };
 
-  /**
-   * Zamienia zapis Discorda, np. <:blik:123>, na obiekt wymagany przez
-   * przyciski i opcje list wyboru. Unicode emoji pozostają bez zmian.
-   */
-  function componentEmoji(value) {
-    const raw = String(value || "").trim();
-    const match = raw.match(/^<(a?):([A-Za-z0-9_]+):(\d{17,20})>$/);
-
-    if (match) {
-      return {
-        animated: match[1] === "a",
-        name: match[2],
-        id: match[3]
-      };
-    }
-
-    return { name: raw || "💱" };
-  }
-
-  function selectEmojiForMethod(value) {
-    const normalized = normalizeExchangeMethod(value);
-
-    if (normalized === "BLIK") return EMOJI.blik;
-    if (normalized === "KODBLIK") return EMOJI.kodblik;
-    if (normalized === "PAYPAL") return EMOJI.paypal;
-    if (normalized === "LTC") return EMOJI.ltc;
-    if (normalized === "CRYPTO") return EMOJI.crypto;
-    if (normalized === "PSC") return EMOJI.psc;
-    if (normalized === "SKRILL") return EMOJI.skrill;
-
-    return EMOJI.money;
-  }
-
-  function createMethodOptions(defaultValue = null, methods = AVAILABLE_METHODS) {
-    const selected = normalizeExchangeMethod(defaultValue);
-
-    return methods.map(value => ({
-      label: displayExchangeMethod(value),
-      value,
-      emoji: componentEmoji(selectEmojiForMethod(value)),
-      ...(selected === value ? { default: true } : {})
-    }));
-  }
-
   // =========================================
   // PROWIZJE
   // =========================================
   const rates = {
+
     "BLIK->PAYPAL": 2,
     "BLIK->CRYPTO": 8,
     "BLIK->LTC": 8,
@@ -559,13 +473,6 @@ module.exports = (client) => {
     "KODBLIK->CRYPTO": 11,
     "KODBLIK->LTC": 11,
     "KODBLIK->SKRILL": 6,
-
-    "PSC->BLIK": 11,
-    "PSC->KODBLIK": 11,
-    "PSC->PAYPAL": 11,
-    "PSC->CRYPTO": 13,
-    "PSC->LTC": 13,
-    "PSC->SKRILL": 11,
 
     "PAYPAL->BLIK": 9,
     "PAYPAL->CRYPTO": 9,
@@ -582,12 +489,29 @@ module.exports = (client) => {
     "LTC->KODBLIK": 4,
     "LTC->PAYPAL": 4,
     "LTC->CRYPTO": 4,
-
+    "PSC->BLIK": 11,
+    "PSC->KODBLIK": 11,
+    "PSC->PAYPAL": 11,
+    "PSC->CRYPTO": 13,
+    "PSC->LTC": 13,
+    "PSC->SKRILL": 11,
     "SKRILL->BLIK": 9,
     "SKRILL->KODBLIK": 9,
     "SKRILL->PAYPAL": 9,
     "SKRILL->CRYPTO": 9,
-    "SKRILL->LTC": 9
+    "SKRILL->LTC": 9,
+    "VINTED->BLIK": 9,
+    "VINTED->PAYPAL": 9,
+    "VINTED->LTC": 9,
+    "VINTED->CRYPTO": 9,
+    "ZEN->BLIK": 4,
+    "ZEN->PAYPAL": 4,
+    "ZEN->LTC": 4,
+    "ZEN->CRYPTO": 4,
+    "BLIK->VINTED": 8,
+    "PAYPAL->VINTED": 9,
+    "LTC->VINTED": 4,
+    "CRYPTO->VINTED": 4,
   };
 
   // =========================================
@@ -637,16 +561,61 @@ module.exports = (client) => {
   }
 
 
-  function normalizeExchangeMethod(value) {
-    const v = String(value || "")
-      .trim()
-      .toUpperCase()
-      .replace(/[\s_-]+/g, "");
+  function exchangeMethodOptions() {
+    return [
+      new StringSelectMenuOptionBuilder()
+        .setLabel("BLIK")
+        .setValue("BLIK")
+        .setEmoji({ id: "1499784231608389742" }),
+      new StringSelectMenuOptionBuilder()
+        .setLabel("KOD BLIK")
+        .setValue("KODBLIK")
+        .setEmoji({ id: "1499784231608389742" }),
+      new StringSelectMenuOptionBuilder()
+        .setLabel("LTC")
+        .setValue("LTC")
+        .setEmoji({ id: "1499784285211726014", name: "ltc" }),
+      new StringSelectMenuOptionBuilder()
+        .setLabel("PAYPAL")
+        .setValue("PAYPAL")
+        .setEmoji({ id: "1499784258091483236" }),
+      new StringSelectMenuOptionBuilder()
+        .setLabel("CRYPTO")
+        .setValue("CRYPTO")
+        .setEmoji({ id: "1499784635201224724" }),
+      new StringSelectMenuOptionBuilder()
+        .setLabel("PSC")
+        .setValue("PSC")
+        .setEmoji({ id: "1519440223140970636", name: "MYPSC" }),
+      new StringSelectMenuOptionBuilder()
+        .setLabel("SKRILL")
+        .setValue("SKRILL")
+        .setEmoji({ id: "1519440276492521472", name: "SKRILL" })
+    ];
+  }
 
-    if (v === "KODBLIK") return "KODBLIK";
-    if (v === "LTC") return "LTC";
-    if (["BTC", "ETH", "SOL", "USDT"].includes(v)) return "CRYPTO";
-    return AVAILABLE_METHODS.includes(v) ? v : null;
+  function currencyOptions() {
+    return [
+      new StringSelectMenuOptionBuilder()
+        .setLabel("PLN")
+        .setValue("PLN")
+        .setEmoji("🇵🇱"),
+      new StringSelectMenuOptionBuilder()
+        .setLabel("EUR")
+        .setValue("EUR")
+        .setEmoji("🇪🇺"),
+      new StringSelectMenuOptionBuilder()
+        .setLabel("USD")
+        .setValue("USD")
+        .setEmoji("🇺🇸")
+    ];
+  }
+
+  function normalizeExchangeMethod(value) {
+    const v = String(value || "").trim().toUpperCase().replace(/\s+/g, "");
+    if (["BLIK", "KODBLIK", "PAYPAL", "LTC", "CRYPTO", "PSC", "SKRILL"].includes(v)) return v;
+    if (v === "KOD-BLIK" || v === "KOD_BLIK") return "KODBLIK";
+    return null;
   }
 
   function normalizeCurrency(value) {
@@ -705,237 +674,64 @@ module.exports = (client) => {
     };
   }
 
+  function getModalSelectValue(fields, customId) {
+    const field = fields?.fields?.get(customId) || fields?.getField?.(customId);
+    if (Array.isArray(field?.values) && field.values.length) return field.values[0];
+    if (typeof field?.value === "string") return field.value;
+    return "";
+  }
+
   function createExchangeModal() {
+    const modal = new ModalBuilder()
+      .setCustomId("exchange_full_modal")
+      .setTitle("Potrzebne informacje.");
+
+    const amountInput = new TextInputBuilder()
+      .setCustomId("exchange_amount")
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder("Np. 48")
+      .setRequired(true);
+
     const amountLabel = new LabelBuilder()
-      .setLabel("JAKA KWOTA")
-      .setDescription("Podaj kwotę wymiany, np. 48")
-      .setTextInputComponent(
-        new TextInputBuilder()
-          .setCustomId("exchange_amount")
-          .setStyle(TextInputStyle.Short)
-          .setPlaceholder("Np. 48")
-          .setMinLength(1)
-          .setMaxLength(20)
-          .setRequired(true)
-      );
+      .setLabel("JAKA KWOTA.")
+      .setTextInputComponent(amountInput);
+
+    const fromSelect = new StringSelectMenuBuilder()
+      .setCustomId("exchange_from")
+      .setPlaceholder("× Nie wybrałeś/aś żadnej opcji.")
+      .setRequired(true)
+      .addOptions(exchangeMethodOptions());
 
     const fromLabel = new LabelBuilder()
-      .setLabel("Z CZEGO")
-      .setDescription("Wybierz metodę, którą posiadasz")
-      .setStringSelectMenuComponent(
-        new StringSelectMenuBuilder()
-          .setCustomId("exchange_from")
-          .setPlaceholder("Wybierz metodę źródłową")
-          .setMinValues(1)
-          .setMaxValues(1)
-          .setRequired(true)
-          .addOptions(createMethodOptions())
-      );
+      .setLabel("Z CZEGO:")
+      .setStringSelectMenuComponent(fromSelect);
+
+    const toSelect = new StringSelectMenuBuilder()
+      .setCustomId("exchange_to")
+      .setPlaceholder("× Nie wybrałeś/aś żadnej opcji.")
+      .setRequired(true)
+      .addOptions(exchangeMethodOptions());
 
     const toLabel = new LabelBuilder()
-      .setLabel("NA CO")
-      .setDescription("Wybierz metodę, którą chcesz otrzymać")
-      .setStringSelectMenuComponent(
-        new StringSelectMenuBuilder()
-          .setCustomId("exchange_to")
-          .setPlaceholder("Wybierz metodę docelową")
-          .setMinValues(1)
-          .setMaxValues(1)
-          .setRequired(true)
-          .addOptions(createMethodOptions())
-      );
+      .setLabel("NA CO:")
+      .setStringSelectMenuComponent(toSelect);
+
+    const currencySelect = new StringSelectMenuBuilder()
+      .setCustomId("exchange_currency")
+      .setPlaceholder("PLN")
+      .setRequired(true)
+      .addOptions(currencyOptions());
 
     const currencyLabel = new LabelBuilder()
-      .setLabel("WALUTA")
-      .setDescription("Wybierz walutę podanej kwoty")
-      .setStringSelectMenuComponent(
-        new StringSelectMenuBuilder()
-          .setCustomId("exchange_currency")
-          .setPlaceholder("Wybierz walutę")
-          .setMinValues(1)
-          .setMaxValues(1)
-          .setRequired(true)
-          .addOptions(
-            { label: "PLN", value: "PLN", emoji: { name: "🇵🇱" }, default: true },
-            { label: "EUR", value: "EUR", emoji: { name: "🇪🇺" } },
-            { label: "USD", value: "USD", emoji: { name: "🇺🇸" } }
-          )
-      );
+      .setLabel("JAKĄ WALUTĘ POSIADASZ:")
+      .setStringSelectMenuComponent(currencySelect);
 
-    return new ModalBuilder()
-      .setCustomId("exchange_full_modal")
-      .setTitle("Formularz wymiany")
-      .addLabelComponents(amountLabel, fromLabel, toLabel, currencyLabel);
-  }
-
-  function isCryptoMethod(value) {
-    return ["CRYPTO", "LTC"].includes(normalizeExchangeMethod(value));
-  }
-
-  function rateMethod(value) {
-    return normalizeExchangeMethod(value);
-  }
-
-  function calculateExchange(amount, from, to, currency = "PLN") {
-    const numericAmount = Number(String(amount).replace(",", "."));
-    const percent = rates[`${rateMethod(from)}->${rateMethod(to)}`];
-    if (!Number.isFinite(numericAmount) || numericAmount <= 0 || !Number.isFinite(percent)) return null;
-    if (normalizeExchangeMethod(from) === normalizeExchangeMethod(to)) return null;
-    const percentageFee = (numericAmount * percent) / 100;
-    const fee = Math.max(percentageFee, 3);
-    if (numericAmount <= fee) return null;
-    // Zgodnie z wymaganiem zawsze obcinamy do pełnych 10 groszy w dół.
-    const afterFee = Math.floor((numericAmount - fee) * 10) / 10;
-    return {
-      amount: numericAmount,
-      from: normalizeExchangeMethod(from),
-      to: normalizeExchangeMethod(to),
-      currency: normalizeCurrency(currency),
-      percent,
-      fee: Number(fee.toFixed(2)),
-      afterFee: Number(afterFee.toFixed(2))
-    };
-  }
-
-  function buildExchangeEmbed(data, userMention) {
-    return new EmbedBuilder()
-      .setColor(EMBED_COLOR)
-      .setTitle(`${EMOJI.money} 🌟 StarX Exchange × WYMIANA WALUTY`)
-      .setDescription([
-        `> ${EMOJI.arrow} Użytkownik ${userMention} utworzył ticket wymiany.`,
-        `> ${EMOJI.arrow} Realizator odpowie najszybciej jak to możliwe.`,
-        ``, `━━━━━━━━━━━━━━━━━━━━━━━`, ``,
-        `${EMOJI.money} **JAKA KWOTA:**`, `> ${formatCurrency(data.amount, data.currency)}`, ``,
-        `${methodEmoji(data.from)} **Z CZEGO:**`, `> ${displayExchangeMethod(data.from)}`, ``,
-        `${methodEmoji(data.to)} **NA CO:**`, `> ${displayExchangeMethod(data.to)}`, ``,
-        `${currencyEmoji(data.currency)} **JAKĄ WALUTĘ POSIADASZ:**`, `> ${data.currency}`, ``,
-        `${EMOJI.zap} **PROWIZJA:**`, `> ${data.percent}% — ${formatCurrency(data.fee, data.currency)} (minimum 3 PLN)`, ``,
-        `${EMOJI.pin} **PO PROWIZJI:**`, `> ${formatCurrency(data.afterFee, data.currency)}`
-      ].join("\n"))
-      .setImage(BANNER_TICKET_URL)
-      .setFooter({ text: "© 2026 StarX Exchange" });
-  }
-
-  function createTicketSettingsModal(channel) {
-    const current = exchangeData.get(channel.id) || (() => {
-      const parts = String(channel.topic || "").split(":");
-      return calculateExchange(parts[2], parts[3], parts[4], parts[5]);
-    })();
-
-    const currentFrom = normalizeExchangeMethod(current?.from) || "BLIK";
-    const currentTo = normalizeExchangeMethod(current?.to) || "CRYPTO";
-
-    const amountLabel = new LabelBuilder()
-      .setLabel("KWOTA WYMIANY")
-      .setDescription("Podaj nową kwotę")
-      .setTextInputComponent(
-        new TextInputBuilder()
-          .setCustomId("settings_amount")
-          .setValue(current ? current.amount.toFixed(2) : "")
-          .setPlaceholder("Np. 50")
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
-      );
-
-    const fromLabel = new LabelBuilder()
-      .setLabel("METODA PŁATNOŚCI — Z CZEGO")
-      .setDescription("Wybierz metodę źródłową")
-      .setStringSelectMenuComponent(
-        new StringSelectMenuBuilder()
-          .setCustomId("settings_from")
-          .setPlaceholder("Wybierz metodę źródłową")
-          .setMinValues(1)
-          .setMaxValues(1)
-          .setRequired(true)
-          .addOptions(createMethodOptions(currentFrom, SETTINGS_METHODS))
-      );
-
-    const toLabel = new LabelBuilder()
-      .setLabel("METODA DOCELOWA — NA CO")
-      .setDescription("Wybierz metodę docelową")
-      .setStringSelectMenuComponent(
-        new StringSelectMenuBuilder()
-          .setCustomId("settings_to")
-          .setPlaceholder("Wybierz metodę docelową")
-          .setMinValues(1)
-          .setMaxValues(1)
-          .setRequired(true)
-          .addOptions(createMethodOptions(currentTo, SETTINGS_METHODS))
-      );
-
-    return new ModalBuilder()
-      .setCustomId("ticket_settings_modal")
-      .setTitle("Ustawienia ticketa")
-      .addLabelComponents(amountLabel, fromLabel, toLabel);
-  }
-
-  async function syncTicketEmbeds(channel, data) {
-    const clientId = String(channel.topic || "").split(":")[0];
-    const messages = await channel.messages.fetch({ limit: 100 }).catch(() => null);
-    if (!messages) return 0;
-    let edited = 0;
-    for (const message of messages.values()) {
-      if (message.author.id !== client.user.id || !message.embeds.length) continue;
-      const embeds = message.embeds.map(embed => {
-        const json = embed.toJSON();
-        const text = `${json.title || ""}\n${json.description || ""}`;
-        if (/WYMIANA WALUTY|PODSUMOWANIE WYMIANY|Informacje O Transakcji/i.test(text)) {
-          return buildExchangeEmbed(data, clientId ? `<@${clientId}>` : "użytkownik");
-        }
-        if (/WYSTAW LEGIT CHECKA|LEGIT CHECK/i.test(text) && json.description) {
-          const fromTo = `${displayExchangeMethod(data.from)} TO ${displayExchangeMethod(data.to)}`;
-          json.description = json.description.replace(/Exchanged\s+[^\n`]+/i,
-            `Exchanged ${fromTo} ${formatCurrency(data.amount, data.currency)}`);
-          return EmbedBuilder.from(json);
-        }
-        return EmbedBuilder.from(json);
-      });
-      const changed = embeds.some((embed, i) => JSON.stringify(embed.toJSON()) !== JSON.stringify(message.embeds[i].toJSON()));
-      if (changed) {
-        await message.edit({ embeds }).catch(err => console.error("TICKET SYNC EDIT ERROR:", err?.message || err));
-        edited += 1;
-      }
-    }
-    return edited;
-  }
-
-  function createPaymentDataModal(method) {
-    const modal = new ModalBuilder().setCustomId("payment_data_modal").setTitle(`Dane płatności • ${displayExchangeMethod(method)}`);
-    if (isCryptoMethod(method)) {
-      return modal.addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder()
-        .setCustomId("wallet_address").setLabel("Adres portfela")
-        .setPlaceholder(`Adres ${displayExchangeMethod(method)}`).setStyle(TextInputStyle.Short).setRequired(true)));
-    }
-    return modal.addComponents(
-      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("payment_receiver").setLabel("Odbiorca").setStyle(TextInputStyle.Short).setRequired(true)),
-      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("payment_title").setLabel("Tytuł").setStyle(TextInputStyle.Short).setRequired(true)),
-      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId("payment_phone").setLabel("Numer telefonu").setStyle(TextInputStyle.Short).setRequired(true))
+    return modal.addLabelComponents(
+      amountLabel,
+      fromLabel,
+      toLabel,
+      currencyLabel
     );
-  }
-
-  async function sendExchangeLegit(channel, exchangerUser, deleteMessage = null) {
-    if (autoLegitSent.has(channel.id)) return false;
-    const parts = String(channel.topic || "").split(":");
-    if (parts[1] !== "exchange") return false;
-    const data = exchangeData.get(channel.id) || calculateExchange(parts[2], parts[3], parts[4], parts[5]);
-    if (!data) return false;
-    autoLegitSent.add(channel.id);
-    const clientId = parts[0];
-    const fromTo = `${displayExchangeMethod(data.from)} TO ${displayExchangeMethod(data.to)}`;
-    const legitText = `+rep <@${exchangerUser.id}> Exchanged ${fromTo} ${formatCurrency(data.amount, data.currency)}`;
-    await channel.send({
-      content: clientId ? `<@${clientId}>` : undefined,
-      embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setTitle("🌟 StarX Exchange × WYSTAW LEGIT CHECKA")
-        .setDescription([
-          `> ${EMOJI.arrow} Dziękujemy ${clientId ? `<@${clientId}>` : ""} za **skorzystanie z naszych usług**.`,
-          `> ${EMOJI.arrow} Prosimy o wystawienie legit checka na kanale <#${LEGIT_CHECK_CHANNEL_ID}>`, "",
-          `> ${EMOJI.arrow} **Wzór:**`, "```text", legitText, "```", "",
-          `> ${EMOJI.arrow} Po wystawieniu legit checka ticket zostanie **automatycznie zamknięty**.`
-        ].join("\n")).setImage(BANNER_LEGIT_URL).setFooter({ text: "© 2026 StarX Exchange" })]
-    });
-    await channel.send({ content: legitText });
-    if (deleteMessage) await deleteMessage.delete().catch(() => {});
-    return true;
   }
 
   // =========================================
@@ -988,7 +784,6 @@ module.exports = (client) => {
   // Obsługa licznika LC i Panelu Klienta znajduje się w customerLegitSystem.js.
 
   client.on(Events.InteractionCreate, async (interaction) => {
-    try {
 
     // =========================
     // MENU
@@ -1000,19 +795,12 @@ module.exports = (client) => {
 
       const type = interaction.values[0];
 
-      if (!interaction.guild) {
-        return interaction.reply({
-          content: `${EMOJI.warning} Wystąpił błąd: tickety można tworzyć wyłącznie na serwerze.`,
-          ephemeral: true
-        });
-      }
-
       // =====================================
       // CHECK EXISTING TICKET
       // =====================================
       const existing =
         interaction.guild.channels.cache.find(c =>
-          c.topic?.startsWith(`${interaction.user.id}:`)
+          c.topic?.startsWith(interaction.user.id)
         );
 
       if (existing)
@@ -1046,10 +834,6 @@ module.exports = (client) => {
       // =====================================
       // CREATE CHANNEL
       // =====================================
-      // Utworzenie kanału i wysłanie wiadomości może potrwać dłużej niż trzy
-      // sekundy. Potwierdzamy interakcję przed rozpoczęciem zapytań do API.
-      await interaction.deferReply({ ephemeral: true });
-
       const channel =
         await interaction.guild.channels.create({
 
@@ -1139,9 +923,10 @@ module.exports = (client) => {
         components: [row]
       });
 
-      return interaction.editReply({
+      return interaction.reply({
         content:
-          `${EMOJI.ticket} Ticket został utworzony: ${channel}`
+          `${EMOJI.ticket} Ticket został utworzony: ${channel}`,
+        ephemeral: true
       });
     }
 
@@ -1174,15 +959,13 @@ module.exports = (client) => {
         });
       }
 
-      const existing = interaction.guild.channels.cache.find(c => c.topic?.startsWith(`${interaction.user.id}:`));
+      const existing = interaction.guild.channels.cache.find(c => c.topic?.startsWith(interaction.user.id));
       if (existing) {
         return interaction.reply({
           content: `${EMOJI.warning} Masz juz ticket: ${existing}`,
           ephemeral: true
         });
       }
-
-      await interaction.deferReply({ ephemeral: true });
 
       const channel = await interaction.guild.channels.create({
         name: unlockTicketName(`middleman-${interaction.user.username}`),
@@ -1242,8 +1025,9 @@ module.exports = (client) => {
         components: [ticketButtons()]
       });
 
-      return interaction.editReply({
-        content: `${EMOJI.ticket} Ticket zostal utworzony: ${channel}`
+      return interaction.reply({
+        content: `${EMOJI.ticket} Ticket zostal utworzony: ${channel}`,
+        ephemeral: true
       });
     }
 
@@ -1251,55 +1035,26 @@ module.exports = (client) => {
     // EXCHANGE MODAL SUBMIT
     // =========================
     if (interaction.isModalSubmit() && interaction.customId === "exchange_full_modal") {
-      const amountRaw = interaction.fields
-        .getTextInputValue("exchange_amount")
-        .trim()
-        .replace(",", ".");
-      const from = normalizeExchangeMethod(
-        interaction.fields.getStringSelectValues("exchange_from")[0]
-      );
-      const to = normalizeExchangeMethod(
-        interaction.fields.getStringSelectValues("exchange_to")[0]
-      );
-      const currencyRaw = String(
-        interaction.fields.getStringSelectValues("exchange_currency")[0] || ""
-      )
-        .trim()
-        .toUpperCase();
-      const currency = ["PLN", "EUR", "USD"].includes(currencyRaw)
-        ? currencyRaw
-        : null;
-      const amount = Number(amountRaw);
+      const amount = interaction.fields.getTextInputValue("exchange_amount");
+      const from = normalizeExchangeMethod(getModalSelectValue(interaction.fields, "exchange_from"));
+      const to = normalizeExchangeMethod(getModalSelectValue(interaction.fields, "exchange_to"));
+      const currency = normalizeCurrency(getModalSelectValue(interaction.fields, "exchange_currency"));
 
-      if (!Number.isFinite(amount) || amount <= 0) {
+      if (!amount || isNaN(amount)) {
         return interaction.reply({
-          content: `${EMOJI.warning} Kwota musi być poprawną liczbą większą od zera.`,
+          content: `${EMOJI.warning} Kwota musi być liczbą.`,
           ephemeral: true
         });
       }
 
       if (!from || !to) {
         return interaction.reply({
-          content: `${EMOJI.warning} Wybierz poprawne metody płatności z listy.`,
+          content: `${EMOJI.warning} Wybierz poprawne metody płatności.`,
           ephemeral: true
         });
       }
 
-      if (from === to) {
-        return interaction.reply({
-          content: `${EMOJI.warning} Metoda źródłowa i docelowa nie mogą być takie same.`,
-          ephemeral: true
-        });
-      }
-
-      if (!currency) {
-        return interaction.reply({
-          content: `${EMOJI.warning} Waluta musi mieć wartość PLN, EUR albo USD.`,
-          ephemeral: true
-        });
-      }
-
-      const existing = interaction.guild.channels.cache.find(c => c.topic?.startsWith(`${interaction.user.id}:`));
+      const existing = interaction.guild.channels.cache.find(c => c.topic?.startsWith(interaction.user.id));
       if (existing) {
         return interaction.reply({
           content: `${EMOJI.warning} Masz już ticket: ${existing}`,
@@ -1307,7 +1062,7 @@ module.exports = (client) => {
         });
       }
 
-      const exchange = `${rateMethod(from)}->${rateMethod(to)}`;
+      const exchange = `${from}->${to}`;
       const percent = rates[exchange];
 
       if (!percent) {
@@ -1317,18 +1072,27 @@ module.exports = (client) => {
         });
       }
 
-      const calculated = calculateExchange(amount, from, to, currency);
-      if (!calculated) {
-        return interaction.reply({ content: `${EMOJI.warning} Nie można obliczyć tej wymiany.`, ephemeral: true });
-      }
-      const exchangePayload = { ...calculated, userId: interaction.user.id, createdAt: Date.now() };
+      const numericAmount = Number(amount);
+      const percentageFee = (numericAmount * percent) / 100;
+      const fee = Math.max(percentageFee, 3);
+      const afterFee = (numericAmount - fee).toFixed(2);
 
-      await interaction.deferReply({ ephemeral: true });
+      const exchangePayload = {
+        userId: interaction.user.id,
+        amount: numericAmount,
+        from,
+        to,
+        currency,
+        percent,
+        fee: Number(fee.toFixed(2)),
+        afterFee: Number(afterFee),
+        createdAt: Date.now()
+      };
 
       const channel = await interaction.guild.channels.create({
         name: unlockTicketName(`${from.toLowerCase()}-${to.toLowerCase()}-${interaction.user.username}`),
         parent: CATEGORY_UNCLAIMED_ID,
-        topic: `${interaction.user.id}:exchange:${calculated.amount}:${from}:${to}:${currency}`,
+        topic: `${interaction.user.id}:exchange:${amount}:${from}:${to}:${currency}`,
         type: ChannelType.GuildText,
         permissionOverwrites: [
           { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
@@ -1353,7 +1117,35 @@ module.exports = (client) => {
         ]
       });
 
-      const embed = buildExchangeEmbed(exchangePayload, interaction.user);
+      const embed = new EmbedBuilder()
+        .setColor(EMBED_COLOR)
+        .setTitle(`${EMOJI.money} 🌟 StarX Exchange × WYMIANA WALUTY`)
+        .setDescription([
+          `> ${EMOJI.arrow} Użytkownik ${interaction.user} utworzył ticket wymiany.`,
+          `> ${EMOJI.arrow} Realizator odpowie najszybciej jak to możliwe.`,
+          ``,
+          `━━━━━━━━━━━━━━━━━━━━━━━`,
+          ``,
+          `${EMOJI.money} **JAKA KWOTA:**`,
+          `> ${formatCurrency(amount, currency)}`,
+          ``,
+          `${methodEmoji(from)} **Z CZEGO:**`,
+          `> ${displayExchangeMethod(from)}`,
+          ``,
+          `${methodEmoji(to)} **NA CO:**`,
+          `> ${displayExchangeMethod(to)}`,
+          ``,
+          `${currencyEmoji(currency)} **JAKĄ WALUTĘ POSIADASZ:**`,
+          `> ${currency}`,
+          ``,
+          `${EMOJI.zap} **PROWIZJA:**`,
+          `> ${percent}% — ${formatCurrency(fee, currency)} (minimum 3 PLN)`,
+          ``,
+          `${EMOJI.pin} **PO PROWIZJI:**`,
+          `> ${formatCurrency(afterFee, currency)}`
+        ].join("\n"))
+        .setImage(BANNER_TICKET_URL)
+        .setFooter({ text: "© 2026 StarX Exchange" });
 
       exchangeData.set(channel.id, exchangePayload);
 
@@ -1363,103 +1155,12 @@ module.exports = (client) => {
         components: [ticketButtons()]
       });
 
-      return interaction.editReply({
-        content: `${EMOJI.ticket} Ticket został utworzony: ${channel}`
+      return interaction.reply({
+        content: `${EMOJI.ticket} Ticket został utworzony: ${channel}`,
+        ephemeral: true
       });
     }
 
-
-    // =========================
-    // TICKET SETTINGS
-    // =========================
-    if (interaction.isButton() && interaction.customId === "ticket_settings") {
-      if (!interaction.member.roles.cache.has(REALIZATOR_ROLE_ID)) {
-        return interaction.reply({ content: `${EMOJI.warning} Tylko realizator może zmieniać ustawienia ticketa.`, ephemeral: true });
-      }
-      if (String(interaction.channel.topic || "").split(":")[1] !== "exchange") {
-        return interaction.reply({ content: `${EMOJI.warning} Ustawienia wymiany są dostępne tylko na ticketach wymiany.`, ephemeral: true });
-      }
-      return interaction.showModal(createTicketSettingsModal(interaction.channel));
-    }
-
-    if (interaction.isModalSubmit() && interaction.customId === "ticket_settings_modal") {
-      if (!interaction.member.roles.cache.has(REALIZATOR_ROLE_ID)) {
-        return interaction.reply({ content: `${EMOJI.warning} Brak uprawnień.`, ephemeral: true });
-      }
-      const amount = interaction.fields.getTextInputValue("settings_amount").trim().replace(",", ".");
-      const from = normalizeExchangeMethod(
-        interaction.fields.getStringSelectValues("settings_from")[0]
-      );
-      const to = normalizeExchangeMethod(
-        interaction.fields.getStringSelectValues("settings_to")[0]
-      );
-      const oldInfo = getExchangeInfoFromTicket(interaction.channel);
-      const calculated = calculateExchange(amount, from, to, oldInfo.currency);
-      if (!calculated) {
-        return interaction.reply({ content: `${EMOJI.warning} Niepoprawna kwota/metoda albo brak prowizji dla tej pary.`, ephemeral: true });
-      }
-      const clientId = String(interaction.channel.topic || "").split(":")[0];
-      await interaction.deferReply({ ephemeral: true });
-      await interaction.channel.setTopic(`${clientId}:exchange:${calculated.amount}:${calculated.from}:${calculated.to}:${calculated.currency}`);
-      const baseTicketName = `${calculated.from.toLowerCase()}-${calculated.to.toLowerCase()}-${interaction.channel.name.split("-").at(-1)}`;
-      const nextTicketName = interaction.channel.name.startsWith("lock-")
-        ? lockTicketName(baseTicketName)
-        : unlockTicketName(baseTicketName);
-      await interaction.channel.setName(nextTicketName).catch(() => {});
-      exchangeData.set(interaction.channel.id, { ...calculated, userId: clientId, updatedAt: Date.now() });
-      const edited = await syncTicketEmbeds(interaction.channel, calculated);
-      return interaction.editReply(`${EMOJI.money} Zapisano ustawienia i zaktualizowano ${edited} wiadomości.`);
-    }
-
-    // =========================
-    // /DANE
-    // =========================
-    if (interaction.isChatInputCommand() && interaction.commandName === "dane") {
-      if (!interaction.member.roles.cache.has(REALIZATOR_ROLE_ID)) {
-        return interaction.reply({ content: `${EMOJI.warning} Tylko realizator może użyć /dane.`, ephemeral: true });
-      }
-      const parts = String(interaction.channel.topic || "").split(":");
-      if (parts[1] !== "exchange") {
-        return interaction.reply({ content: `${EMOJI.warning} Komenda działa wyłącznie na tickecie wymiany.`, ephemeral: true });
-      }
-      const method = getExchangeInfoFromTicket(interaction.channel).from;
-      pendingPaymentData.set(`${interaction.channel.id}:${interaction.user.id}`, { method });
-      return interaction.showModal(createPaymentDataModal(method));
-    }
-
-    if (interaction.isModalSubmit() && interaction.customId === "payment_data_modal") {
-      const key = `${interaction.channel.id}:${interaction.user.id}`;
-      const pending = pendingPaymentData.get(key);
-      if (!pending) return interaction.reply({ content: `${EMOJI.warning} Formularz wygasł. Użyj ponownie /dane.`, ephemeral: true });
-      pendingPaymentData.delete(key);
-      const method = pending.method;
-      const lines = [`**Exchanger:**`, `${interaction.user}`, ``, `**Metoda:**`, `${displayExchangeMethod(method)}`, ``];
-      let copyText;
-      if (isCryptoMethod(method)) {
-        const address = interaction.fields.getTextInputValue("wallet_address").trim();
-        lines.push(`**Adres ${displayExchangeMethod(method)}:**`, address);
-        copyText = address;
-      } else {
-        const receiver = interaction.fields.getTextInputValue("payment_receiver").trim();
-        const title = interaction.fields.getTextInputValue("payment_title").trim();
-        const phone = interaction.fields.getTextInputValue("payment_phone").trim();
-        lines.push(`**Odbiorca:**`, receiver, ``, `**Tytuł:**`, title, ``, `**Nr:**`, phone);
-        copyText = `Odbiorca: ${receiver}\nTytuł: ${title}\nNr: ${phone}`;
-      }
-      await interaction.reply({
-        embeds: [new EmbedBuilder().setColor(EMBED_COLOR).setTitle("🌟 StarX Exchange × DANE PŁATNOŚCI").setDescription(lines.join("\n")).setFooter({ text: "© 2026 StarX Exchange" })],
-        components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId("copy_payment_data").setLabel("Kopiuj dane").setEmoji("📋").setStyle(ButtonStyle.Secondary))]
-      });
-      const sent = await interaction.fetchReply().catch(() => null);
-      if (sent) pendingPaymentData.set(`message:${sent.id}`, { copyText });
-      return;
-    }
-
-    if (interaction.isButton() && interaction.customId === "copy_payment_data") {
-      const data = pendingPaymentData.get(`message:${interaction.message.id}`);
-      if (!data) return interaction.reply({ content: `${EMOJI.warning} Nie udało się odczytać danych.`, ephemeral: true });
-      return interaction.reply({ content: `\`\`\`text\n${data.copyText}\n\`\`\``, ephemeral: true });
-    }
 
     // =========================
     // CLAIM BUTTON
@@ -1555,19 +1256,11 @@ module.exports = (client) => {
 
       const item = interaction.fields.getTextInputValue("purchase_item").trim();
       const amountRaw = interaction.fields.getTextInputValue("purchase_amount").trim().replace(",", ".");
-      const method = normalizeExchangeMethod(
-        interaction.fields.getStringSelectValues("purchase_method")[0]
-      );
+      const method = interaction.fields.getTextInputValue("purchase_method").trim().toUpperCase();
 
       const amountNumber = Number(amountRaw);
-      if (!Number.isFinite(amountNumber) || amountNumber <= 0 || !method) {
-        return interaction.reply({
-          content: `${EMOJI.warning} Podaj poprawną kwotę i wybierz metodę płatności.`,
-          ephemeral: true
-        });
-      }
-      const amountText = `${amountNumber.toFixed(2)} PLN`;
-      const legitText = `+rep <@${interaction.user.id}> Purchased ${item} ${amountText} [${displayExchangeMethod(method)}]`;
+      const amountText = Number.isFinite(amountNumber) ? `${amountNumber.toFixed(0)}PLN` : `${amountRaw}PLN`;
+      const legitText = `+rep ${interaction.user} Purchased ${item} ${amountText} [${method}]`;
 
       saveCustomerTransaction(interaction, {
         clientId,
@@ -1603,10 +1296,6 @@ module.exports = (client) => {
             .setImage(BANNER_LEGIT_URL)
             .setFooter({ text: "© 2026 StarX Exchange" })
         ]
-      });
-
-      await interaction.channel.send({ content: legitText }).catch(error => {
-        console.error("PURCHASE LEGIT RAW MESSAGE ERROR:", error?.message || error);
       });
 
       try {
@@ -1681,10 +1370,6 @@ module.exports = (client) => {
         ]
       });
 
-      await interaction.channel.send({ content: legitText }).catch(error => {
-        console.error("MIDDLEMAN LEGIT RAW MESSAGE ERROR:", error?.message || error);
-      });
-
       try {
         const sendTempPing = async (channelId) => {
           if (!clientId || !channelId) return;
@@ -1729,7 +1414,7 @@ module.exports = (client) => {
       const amount = topicParts?.[2] || "0.00";
       const exchangeInfo = getExchangeInfoFromTicket(interaction.channel);
       const fromTo = `${displayExchangeMethod(exchangeInfo.from)} TO ${displayExchangeMethod(exchangeInfo.to)}`;
-      const legitText = `+rep <@${interaction.user.id}> Exchanged ${fromTo} ${formatCurrency(amount, exchangeInfo.currency)}`;
+      const legitText = `+rep ${interaction.user} Exchanged ${fromTo} ${formatCurrency(amount, exchangeInfo.currency)}`;
 
       saveCustomerTransaction(interaction, {
         clientId,
@@ -1766,10 +1451,6 @@ module.exports = (client) => {
             .setImage(BANNER_LEGIT_URL)
             .setFooter({ text: "© 2026 StarX Exchange" })
         ]
-      });
-
-      await interaction.channel.send({ content: legitText }).catch(error => {
-        console.error("EXCHANGE LEGIT RAW MESSAGE ERROR:", error?.message || error);
       });
 
       try {
@@ -1815,35 +1496,6 @@ module.exports = (client) => {
 
       return;
     }
-    } catch (err) {
-      console.error("TICKET INTERACTION ERROR:", err?.stack || err);
-      const payload = {
-        content: `${EMOJI.warning} Wystąpił błąd podczas obsługi ticketa. Spróbuj ponownie lub skontaktuj się z administracją.`,
-        ephemeral: true
-      };
-
-      if (interaction.deferred) {
-        await interaction.editReply(payload).catch(() => {});
-      } else if (interaction.replied) {
-        await interaction.followUp(payload).catch(() => {});
-      } else if (interaction.isRepliable()) {
-        await interaction.reply(payload).catch(() => {});
-      }
-    }
-  });
-
-  client.on(Events.MessageCreate, async message => {
-    try {
-      if (message.author.bot || !message.guild || message.content.trim().toLowerCase() !== "sent") return;
-      const parts = String(message.channel.topic || "").split(":");
-      if (parts[1] !== "exchange") return;
-      const claimedId = claimedTickets.get(message.channel.id);
-      const exchanger = claimedId
-        ? await message.guild.members.fetch(claimedId).then(m => m.user).catch(() => message.author)
-        : message.author;
-      await sendExchangeLegit(message.channel, exchanger, message);
-    } catch (err) {
-      console.error("AUTO SENT LEGIT ERROR:", err?.stack || err);
-    }
   });
 };
+

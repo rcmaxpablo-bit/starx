@@ -56,13 +56,13 @@ module.exports = (client) => {
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId("legit_yes")
-          .setEmoji({ id: "1499784353012514917" })
+          .setEmoji("1499784353012514917")
           .setLabel(`${yesVotes}`)
           .setStyle(ButtonStyle.Secondary),
 
         new ButtonBuilder()
           .setCustomId("legit_no")
-          .setEmoji({ id: "1499784378992295956" })
+          .setEmoji("1499784378992295956")
           .setLabel(`${noVotes}`)
           .setStyle(ButtonStyle.Secondary)
       );
@@ -120,13 +120,13 @@ module.exports = (client) => {
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId("legit_yes")
-        .setEmoji({ id: "1499784353012514917" })
+        .setEmoji("1499784353012514917")
         .setLabel(`${yesVotes}`)
         .setStyle(ButtonStyle.Secondary),
 
       new ButtonBuilder()
         .setCustomId("legit_no")
-        .setEmoji({ id: "1499784378992295956" })
+        .setEmoji("1499784378992295956")
         .setLabel(`${noVotes}`)
         .setStyle(ButtonStyle.Secondary)
     );
