@@ -1,0 +1,11 @@
+NAPRAWA PANELU KLIENTA
+
+1. Obsługa menu Panelu Klienta jest rejestrowana jako pierwszy listener interactionCreate.
+2. Menu i /panelklienta są natychmiast potwierdzane przez deferReply({ flags: 64 }).
+3. Odpowiedź jest wysyłana przez editReply, więc Discord nie pokazuje „Aplikacja nie reaguje”.
+4. /panelklienta wysyła nowy panel albo edytuje istniejący.
+5. Panel jest odnajdywany zarówno po customId menu, jak i po tytule embeda.
+6. panelManager obsługuje customId z component.customId i component.data.custom_id.
+
+Po wdrożeniu użyj /panelklienta jeden raz. Stara wiadomość zostanie edytowana,
+a jeżeli nie da się jej edytować, bot wyśle nową.

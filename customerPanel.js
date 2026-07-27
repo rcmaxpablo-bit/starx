@@ -4,8 +4,6 @@ const {
   ActionRowBuilder,
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
-  PermissionFlagsBits,
-  MessageFlags
 } = require('discord.js');
 const store = require('./dataStore');
 const { upsertPanel } = require('./panelManager');
@@ -151,7 +149,10 @@ module.exports = (client) => {
       const message = await upsertPanel(
         channel,
         customerPanelPayload(),
-        { customId: CUSTOMER_MENU_ID }
+        {
+          customId: CUSTOMER_MENU_ID,
+          embedTitle: '🌟 StarX Exchange » PANEL KLIENTA'
+        }
       );
 
       console.log(
@@ -289,36 +290,69 @@ module.exports = (client) => {
     await replaceLegitPanel('start').catch(() => {});
   });
 
-  client.on(Events.InteractionCreate, async interaction => {
-    if (interaction.isChatInputCommand() && interaction.commandName === 'panelklienta') {
-      if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
-        return interaction.reply({ content: '❌ Brak uprawnień administratora.', flags: MessageFlags.Ephemeral }).catch(() => {});
+  // Rejestrujemy obsługę Panelu Klienta jako pierwszą. W projekcie jest wiele
+  // listenerów interactionCreate; prependListener gwarantuje, że panel potwierdzi
+  // interakcję zanim inne moduły zaczną ją sprawdzać.
+  client.prependListener(Events.InteractionCreate, async interaction => {
+    const isPanelCommand =
+      interaction.isChatInputCommand?.() &&
+      interaction.commandName === 'panelklienta';
+
+    const isPanelMenu =
+      interaction.isStringSelectMenu?.() &&
+      (
+        interaction.customId === CUSTOMER_MENU_ID ||
+        (
+          interaction.channelId === CUSTOMER_PANEL_CHANNEL_ID &&
+          interaction.message?.embeds?.some(embed =>
+            String(embed.title || '').toUpperCase().includes('PANEL KLIENTA')
+          )
+        )
+      );
+
+    if (!isPanelCommand && !isPanelMenu) return;
+
+    try {
+      // Potwierdzamy każdą interakcję od razu. Użycie liczbowej flagi 64 jest
+      // zgodne ze wszystkimi wersjami discord.js v14 i nie zależy od eksportu
+      // MessageFlags w konkretnej wersji biblioteki.
+      if (!interaction.deferred && !interaction.replied) {
+        await interaction.deferReply({ flags: 64 });
       }
 
-      try {
-        // Discord musi dostać potwierdzenie w ciągu 3 sekund.
-        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-        const message = await publishCustomerPanel(`/panelklienta przez ${interaction.user.id}`);
+      if (isPanelCommand) {
+        // Komenda i tak jest wdrażana z uprawnieniem Administrator, dlatego nie
+        // blokujemy jej ponownie przez memberPermissions (w niektórych cache'ach
+        // Discord zwraca tam null i komenda wcześniej kończyła się timeoutem).
+        const message = await publishCustomerPanel(
+          `/panelklienta przez ${interaction.user.id}`
+        );
+
         return interaction.editReply({
-          content: `✅ Panel Klienta został odświeżony na <#${CUSTOMER_PANEL_CHANNEL_ID}>.\nID wiadomości: \`${message.id}\``
+          content: [
+            `✅ Panel Klienta został wysłany lub zaktualizowany na <#${CUSTOMER_PANEL_CHANNEL_ID}>.`,
+            `ID wiadomości: \`${message.id}\``
+          ].join('\n')
         });
-      } catch (error) {
-        console.error('❌ /panelklienta ERROR:', error?.stack || error);
-        const text = `❌ Nie udało się wysłać Panelu Klienta na <#${CUSTOMER_PANEL_CHANNEL_ID}>. Sprawdź logi Railway: ${String(error?.message || error).slice(0, 500)}`;
-        if (interaction.deferred || interaction.replied) return interaction.editReply({ content: text }).catch(() => {});
-        return interaction.reply({ content: text, flags: MessageFlags.Ephemeral }).catch(() => {});
       }
-    }
-    if (!interaction.isStringSelectMenu()) return;
-    const looksLikePanel = interaction.customId === CUSTOMER_MENU_ID || (interaction.channelId === CUSTOMER_PANEL_CHANNEL_ID && interaction.message?.embeds?.some(e => String(e.title || '').toUpperCase().includes('PANEL KLIENTA')));
-    if (!looksLikePanel) return;
-    try {
-      // Odpowiedź wysyłamy natychmiast; brak deferUpdate/followUp eliminuje timeout starego menu.
+
       const payload = await responseFor(interaction);
-      await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });
-    } catch (err) {
-      console.error('❌ PANEL INTERACTION:', err?.stack || err);
-      if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: '❌ Błąd Panelu Klienta. Sprawdź logi Railway.', flags: MessageFlags.Ephemeral }).catch(() => {});
+      return interaction.editReply(payload);
+    } catch (error) {
+      console.error(
+        isPanelCommand ? '❌ /panelklienta ERROR:' : '❌ PANEL INTERACTION:',
+        error?.stack || error
+      );
+
+      const content = isPanelCommand
+        ? `❌ Nie udało się wysłać Panelu Klienta na <#${CUSTOMER_PANEL_CHANNEL_ID}>: ${String(error?.message || error).slice(0, 500)}`
+        : `❌ Nie udało się odczytać danych Panelu Klienta: ${String(error?.message || error).slice(0, 300)}`;
+
+      if (interaction.deferred || interaction.replied) {
+        return interaction.editReply({ content }).catch(() => {});
+      }
+
+      return interaction.reply({ content, flags: 64 }).catch(() => {});
     }
   });
 

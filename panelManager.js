@@ -58,13 +58,20 @@ function hasCustomId(message, customId) {
   if (!customId) return false;
 
   return Boolean(message.components?.some(row =>
-    row.components?.some(component => component.customId === customId)
+    row.components?.some(component =>
+      (component.customId || component.data?.custom_id) === customId
+    )
   ));
 }
 
 function hasEmbedTitle(message, embedTitle) {
   if (!embedTitle) return false;
-  return Boolean(message.embeds?.some(embed => embed.title === embedTitle));
+
+  const expected = String(embedTitle).trim().toUpperCase();
+
+  return Boolean(message.embeds?.some(embed =>
+    String(embed.title || '').trim().toUpperCase() === expected
+  ));
 }
 
 function matchesPanel(message, clientUserId, options = {}) {
