@@ -4,7 +4,9 @@ module.exports = (client) => {
 
   const WELCOME_CHANNEL_ID = "1499527016347865399";
 
+  // =====================
   // EMOJI
+  // =====================
   const EMOJI = {
     wave: "👋",
     ticket: "🎫",
@@ -21,7 +23,9 @@ module.exports = (client) => {
     lock: "<:lock:1501697222901895258>"
   };
 
+  // =====================
   // MEMBER JOIN
+  // =====================
   client.on(Events.GuildMemberAdd, async (member) => {
 
     try {
@@ -35,7 +39,9 @@ module.exports = (client) => {
       // liczba osób
       const memberCount = member.guild.memberCount;
 
+      // =====================
       // EMBED
+      // =====================
       const embed = new EmbedBuilder()
 
         .setColor('#1b2dff')
@@ -84,7 +90,9 @@ module.exports = (client) => {
 
         .setTimestamp();
 
+      // =====================
       // SEND
+      // =====================
       await channel.send({
         content: `${EMOJI.wave} ${member}`,
         embeds: [embed]

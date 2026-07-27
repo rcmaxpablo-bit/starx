@@ -11,12 +11,16 @@ const {
 
 module.exports = (client) => {
 
+    // =====================================
     // CONFIG
+    // =====================================
     const STAFF_ROLE_ID = "1500930428993933373";
     const CLIENT_ROLE_ID = "1499572498604363918";
     const REP_CHANNEL_ID = "1500893110048133253";
 
+    // =====================================
     // EMOJI
+    // =====================================
     const EMOJI = {
 
         ticket: "<:TICKET:1501697124734206032>",
@@ -64,7 +68,9 @@ module.exports = (client) => {
 
         try {
 
+            // =====================================
             // /LC COMMAND
+            // =====================================
             if (
                 interaction.isChatInputCommand() &&
                 interaction.commandName === "lc"
@@ -107,7 +113,9 @@ module.exports = (client) => {
                 });
             }
 
+            // =====================================
             // SELECT MENU
+            // =====================================
             if (
                 interaction.isStringSelectMenu() &&
                 interaction.customId === "lc_type"
@@ -226,7 +234,9 @@ ${EMOJI.arrow} **Wklej na <#${REP_CHANNEL_ID}>**`
                 }
             }
 
+            // =====================================
             // PURCHASED
+            // =====================================
             if (interaction.isModalSubmit() && interaction.customId === "lc_purchased") {
 
                 const product = interaction.fields.getTextInputValue("product");
@@ -261,7 +271,9 @@ ${EMOJI.arrow} **Wklej na <#${REP_CHANNEL_ID}>**`
                 });
             }
 
+            // =====================================
             // EXCHANGE
+            // =====================================
             if (interaction.isModalSubmit() && interaction.customId === "lc_exchange") {
 
                 const from = interaction.fields.getTextInputValue("from");
@@ -301,7 +313,9 @@ ${EMOJI.arrow} **Wklej na <#${REP_CHANNEL_ID}>**`
         }
     });
 
+    // =====================================
     // REMOVE ACCESS AFTER REP MESSAGE
+    // =====================================
     client.on(Events.MessageCreate, async (message) => {
 
         try {

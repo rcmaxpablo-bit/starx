@@ -1,4 +1,6 @@
+// =====================================
 // GIVEAWAY SYSTEM FINAL FIXED
+// =====================================
 
 const {
     EmbedBuilder,
@@ -14,7 +16,9 @@ const path = require("path");
 
 module.exports = (client) => {
 
+    // =====================================
     // CONFIG
+    // =====================================
 
     const GIVEAWAY_CHANNEL_ID =
         "1502022020487970948";
@@ -23,7 +27,9 @@ module.exports = (client) => {
     const DATA_FILE = path.join(DATA_DIR, "giveaways.json");
     const LEGACY_DATA_FILE = path.join(__dirname, "giveaways.json");
 
+    // =====================================
     // EMOJI
+    // =====================================
 
     const EMOJI = {
 
@@ -64,7 +70,9 @@ module.exports = (client) => {
             "<a:no:1499784378992295956>"
     };
 
+    // =====================================
     // DATABASE
+    // =====================================
 
     let giveaways = {};
 
@@ -97,7 +105,9 @@ module.exports = (client) => {
 
     loadData();
 
+    // =====================================
     // READY
+    // =====================================
 
     client.once(
         Events.ClientReady,
@@ -111,7 +121,9 @@ module.exports = (client) => {
         }
     );
 
+    // =====================================
     // TIME PARSER
+    // =====================================
 
     function parseTime(time) {
         const normalized = String(time || "").trim().toLowerCase();
@@ -140,7 +152,9 @@ module.exports = (client) => {
         return users[Math.floor(Math.random() * users.length)] || null;
     }
 
+    // =====================================
     // UPDATE EMBED
+    // =====================================
 
     async function updateGiveawayMessage(id) {
 
@@ -238,7 +252,9 @@ ${EMOJI.arrow} Kliknij przycisk poniżej aby dołączyć.
         });
     }
 
+    // =====================================
     // AUTO END
+    // =====================================
 
     function startChecker() {
 
@@ -264,7 +280,9 @@ ${EMOJI.arrow} Kliknij przycisk poniżej aby dołączyć.
         }, 5000);
     }
 
+    // =====================================
     // END GIVEAWAY
+    // =====================================
 
     async function endGiveaway(id) {
 
@@ -413,13 +431,17 @@ ${EMOJI.ticket} **ID**
         });
     }
 
+    // =====================================
     // INTERACTIONS
+    // =====================================
 
     client.on(
         Events.InteractionCreate,
         async interaction => {
 
+            // =====================================
             // CREATE GIVEAWAY
+            // =====================================
 
             if (
                 interaction.isChatInputCommand() &&
@@ -522,7 +544,9 @@ ${EMOJI.ticket} **ID**
                 });
             }
 
+            // =====================================
             // JOIN BUTTON
+            // =====================================
 
             if (
                 interaction.isButton() &&
@@ -599,7 +623,9 @@ ${EMOJI.ticket} **ID**
             }
 
 
+            // =====================================
             // UCZESTNICY GIVEAWAY
+            // =====================================
 
             if (
                 interaction.isChatInputCommand() &&
@@ -700,7 +726,9 @@ ${chunks[0] || "Brak uczestników"}`
                 return;
             }
 
+            // =====================================
             // REROLL BUTTON
+            // =====================================
 
             if (
                 interaction.isChatInputCommand() &&

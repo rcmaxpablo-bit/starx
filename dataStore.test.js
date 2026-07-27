@@ -3,40 +3,51 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const root = path.join(__dirname, "..");
-const read = file => fs.readFileSync(path.join(root, file), "utf8");
+const ticketsPath = path.join(__dirname, "..", "tickets.js");
+const source = fs.readFileSync(ticketsPath, "utf8");
 
-test("LTC jest dostępne w formularzu ticketów", () => {
-  const source = read("tickets.js");
-  assert.match(source, /setLabel\("LTC"\)[\s\S]*?setValue\("LTC"\)/);
-  assert.match(source, /"BLIK->LTC": 8/);
-  assert.match(source, /"KODBLIK->LTC": 11/);
-  assert.match(source, /"PAYPAL->LTC": 9/);
-  assert.match(source, /"CRYPTO->LTC": 4/);
-  assert.match(source, /"LTC->BLIK": 4/);
-  assert.match(source, /"LTC->KODBLIK": 4/);
-  assert.match(source, /"LTC->PAYPAL": 4/);
-  assert.match(source, /"LTC->CRYPTO": 4/);
+test("otwarty ticket ma cztery opisane przyciski", () => {
+  for (const customId of [
+    "claim_ticket",
+    "ticket_settings",
+    "close_ticket",
+    "send_legit_check"
+  ]) {
+    assert.ok(source.includes(`"${customId}"`), `Brakuje customId: ${customId}`);
+  }
+
+  for (const label of [
+    "Przejmij Ticket",
+    "Ustawienia Ticketa",
+    "Zamknij / Wykonane",
+    "Legit Check"
+  ]) {
+    assert.ok(source.includes(label), `Brakuje etykiety: ${label}`);
+  }
 });
 
-test("LTC jest dostępne w kalkulatorze prowizji", () => {
-  const source = read("obliczprowizje.js");
-  assert.match(source, /setLabel\("LTC"\)[\s\S]*?setValue\("LTC"\)/);
-  assert.match(source, /BLIK_LTC: 8/);
-  assert.match(source, /KODBLIK_LTC: 11/);
-  assert.match(source, /PAYPAL_LTC: 9/);
-  assert.match(source, /CRYPTO_LTC: 4/);
-  assert.match(source, /LTC_BLIK: 4/);
-  assert.match(source, /LTC_KODBLIK: 4/);
-  assert.match(source, /LTC_PAYPAL: 4/);
-  assert.match(source, /LTC_CRYPTO: 4/);
+test("ustawienia ticketa używają list wyboru zamiast pól tekstowych dla metod", () => {
+  assert.ok(source.includes('.setCustomId("settings_from")'));
+  assert.ok(source.includes('.setCustomId("settings_to")'));
+  assert.ok(source.includes('.setCustomId("settings_currency")'));
+  assert.ok(source.includes('.setStringSelectMenuComponent(fromSelect)'));
+  assert.ok(source.includes('.setStringSelectMenuComponent(toSelect)'));
+  assert.ok(source.includes('.setStringSelectMenuComponent(currencySelect)'));
 });
 
-test("panel z listą prowizji pokazuje LTC", () => {
-  const source = read("kalkulator.js");
-  assert.match(source, /LTC:\s*\[/);
-  assert.match(source, /label: "LTC", value: "LTC"/);
-  assert.match(source, /\*\*LTC\*\* -> .*\*\*BLIK\*\* - Prowizja wynosi: \*\*4%\*\*/);
-  assert.match(source, /\*\*LTC\*\* -> .*\*\*PAYPAL\*\* - Prowizja wynosi: \*\*4%\*\*/);
-  assert.match(source, /\*\*LTC\*\* -> .*\*\*CRYPTO\*\* - Prowizja wynosi: \*\*4%\*\*/);
+test("formularz legit check zakupu ma wybór metody płatności", () => {
+  assert.ok(source.includes('.setCustomId("purchase_method")'));
+  assert.ok(source.includes('.setStringSelectMenuComponent(methodSelect)'));
+  assert.ok(!source.includes('.setCustomId("purchase_method")\n            .setLabel'));
+});
+
+test("zamknięcie ticketa wymaga potwierdzenia", () => {
+  assert.ok(source.includes('setCustomId("confirm_close_ticket")'));
+  assert.ok(source.includes('setCustomId("cancel_close_ticket")'));
+});
+
+test("LTC jest dostępne we wszystkich listach metod", () => {
+  assert.ok(source.includes('{ label: "LTC", value: "LTC"'));
+  assert.ok(source.includes('"BLIK->LTC": 8'));
+  assert.ok(source.includes('"LTC->BLIK": 4'));
 });

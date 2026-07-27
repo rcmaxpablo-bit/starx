@@ -17,7 +17,9 @@ module.exports = (client) => {
   let legitMessageId = null;
   const votedUsers = new Set();
 
+  // =====================
   // PANEL
+  // =====================
   async function sendPanel() {
     try {
       const channel = await client.channels.fetch(CHANNEL_ID);
@@ -81,7 +83,9 @@ module.exports = (client) => {
     await sendPanel();
   });
 
+  // =====================
   // BUTTONY
+  // =====================
   client.on(Events.InteractionCreate, async (interaction) => {
     if (!interaction.isButton()) return;
     if (interaction.message.id !== legitMessageId) return;

@@ -47,11 +47,15 @@ module.exports = (client) => {
       "<:lock:1501697222901895258>"
   };
 
+  // =====================================
   // CLAIMED
+  // =====================================
   const claimedTickets =
     new Map();
 
+  // =====================================
   // INTERACTIONS
+  // =====================================
   client.on(
     Events.InteractionCreate,
     async (interaction) => {
@@ -60,7 +64,9 @@ module.exports = (client) => {
         !interaction.isChatInputCommand()
       ) return;
 
+      // =====================================
       // CHECK TICKET
+      // =====================================
       const validTicket =
 
         interaction.channel.name.startsWith("exchange-") ||
@@ -87,7 +93,9 @@ module.exports = (client) => {
 
         interaction.channel.name.startsWith("skrill-");
 
+      // =====================================
       // /PRZEJMIJ
+      // =====================================
       if (
         interaction.commandName ===
         "przejmij"
@@ -139,7 +147,9 @@ module.exports = (client) => {
             });
           }
 
+          // =====================================
           // HIDE ROLE
+          // =====================================
           await interaction.channel.permissionOverwrites.edit(
 
             REALIZATOR_ROLE_ID,
@@ -149,7 +159,9 @@ module.exports = (client) => {
             }
           );
 
+          // =====================================
           // ADD USER ACCESS
+          // =====================================
           await interaction.channel.permissionOverwrites.edit(
 
             interaction.user.id,
@@ -198,7 +210,9 @@ module.exports = (client) => {
         }
       }
 
+      // =====================================
       // /ODPRZYJMIJ
+      // =====================================
       if (
         interaction.commandName ===
         "odprzyjmij"
@@ -250,7 +264,9 @@ module.exports = (client) => {
             });
           }
 
+          // =====================================
           // RESTORE ROLE
+          // =====================================
           await interaction.channel.permissionOverwrites.edit(
 
             REALIZATOR_ROLE_ID,
@@ -264,7 +280,9 @@ module.exports = (client) => {
             }
           );
 
+          // =====================================
           // REMOVE USER OVERWRITE
+          // =====================================
           await interaction.channel.permissionOverwrites.delete(
 
             claimedTickets.get(

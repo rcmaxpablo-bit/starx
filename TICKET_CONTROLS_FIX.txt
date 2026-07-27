@@ -1,0 +1,26 @@
+NAPRAWIONE ELEMENTY TICKETÓW
+
+1. Otwarty ticket ma cztery opisane przyciski:
+   - Przejmij Ticket / Oddaj Ticket
+   - Ustawienia Ticketa
+   - Zamknij / Wykonane
+   - Legit Check
+
+2. Ustawienia wymiany:
+   - kwota jest wpisywana,
+   - metoda źródłowa jest wybierana z listy,
+   - metoda docelowa jest wybierana z listy,
+   - waluta jest wybierana z listy.
+
+3. Legit Check zakupu:
+   - metoda płatności jest wybierana z listy,
+   - LTC jest dostępne na liście.
+
+4. Zamknięcie ticketa wymaga potwierdzenia przyciskiem.
+
+5. Przejmowanie działa także po restarcie bota dzięki odczytaniu uprawnień kanału.
+
+6. Dodano obsługę błędów interakcji, aby Discord nie zostawiał komunikatu
+   „aplikacja nie odpowiada”.
+
+Testy: 11/11 zakończone powodzeniem.

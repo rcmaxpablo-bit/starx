@@ -11,7 +11,9 @@ const { upsertPanel } = require("./panelManager");
 
 module.exports = (client) => {
 
+    // =========================================
     // CONFIG
+    // =========================================
     const VERIFY_CHANNEL_ID = "1499725942313058344";
     const VERIFIED_ROLE_ID = "1499521304146083954";
 
@@ -26,7 +28,9 @@ module.exports = (client) => {
         "1500261480212205629"
     ];
 
+    // =========================================
     // CUSTOM EMOJIS
+    // =========================================
     const EMOJIS = {
         verify: "<a:verify:1499784353012514917>",
         shield: "<:shield:1501989271077388500>",
@@ -36,7 +40,9 @@ module.exports = (client) => {
     // przechowywanie odpowiedzi
     const challenges = new Map();
 
+    // =========================================
     // GENEROWANIE DZIAŁANIA
+    // =========================================
     function generateMath() {
 
         const isAdd = Math.random() > 0.5;
@@ -63,7 +69,9 @@ module.exports = (client) => {
         };
     }
 
+    // =========================================
     // TWORZENIE MENU
+    // =========================================
     function createMenu() {
 
         return new ActionRowBuilder().addComponents(
@@ -84,7 +92,9 @@ module.exports = (client) => {
         );
     }
 
+    // =========================================
     // PANEL
+    // =========================================
     async function sendPanel() {
 
         const channel = await client.channels.fetch(VERIFY_CHANNEL_ID);
@@ -113,7 +123,9 @@ module.exports = (client) => {
         }, { customId: "verify_select" });
     }
 
+    // =========================================
     // READY
+    // =========================================
     client.once(Events.ClientReady, async () => {
 
         console.log(`${client.user.tag} online`);
@@ -121,10 +133,14 @@ module.exports = (client) => {
         await sendPanel();
     });
 
+    // =========================================
     // INTERAKCJE
+    // =========================================
     client.on(Events.InteractionCreate, async (interaction) => {
 
+        // =====================================
         // SELECT MENU
+        // =====================================
         if (interaction.isStringSelectMenu()) {
 
             if (interaction.customId !== "verify_select") return;
@@ -152,7 +168,9 @@ module.exports = (client) => {
 
             await interaction.showModal(modal);
 
+            // =================================
             // RESET SELECT MENU
+            // =================================
             setTimeout(async () => {
 
                 await interaction.message.edit({
@@ -162,7 +180,9 @@ module.exports = (client) => {
             }, 500);
         }
 
+        // =====================================
         // MODAL SUBMIT
+        // =====================================
         if (interaction.isModalSubmit()) {
 
             if (interaction.customId !== "math_modal") return;
@@ -170,7 +190,9 @@ module.exports = (client) => {
             const userAnswer = interaction.fields.getTextInputValue("math_answer");
             const correctAnswer = challenges.get(interaction.user.id);
 
+            // =================================
             // POPRAWNA ODPOWIEDŹ
+            // =================================
             if (Number(userAnswer) === correctAnswer) {
 
                 challenges.delete(interaction.user.id);
@@ -180,7 +202,9 @@ module.exports = (client) => {
                 // dodanie roli
                 await member.roles.add(VERIFIED_ROLE_ID);
 
+                // =================================
                 // PING NA KANAŁACH
+                // =================================
                 for (const channelId of PING_CHANNELS) {
 
                     try {
@@ -203,7 +227,9 @@ module.exports = (client) => {
                     }
                 }
 
+                // =================================
                 // SUKCES
+                // =================================
                 const successEmbed = new EmbedBuilder()
                     .setColor('#1b2dff')
                     .setDescription(
@@ -217,7 +243,9 @@ module.exports = (client) => {
 
             } else {
 
+                // =================================
                 // BŁĘDNA ODPOWIEDŹ
+                // =================================
                 const errorEmbed = new EmbedBuilder()
                     .setColor('#1b2dff')
                     .setDescription(
