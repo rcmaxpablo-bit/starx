@@ -74,3 +74,9 @@ Zrobione pod wygląd ze screenów, ale z brandingiem **🌟 StarX Exchange**.
 - Licznik LC pobiera kanał bezpośrednio po ID `1500893110048133253`.
 - Dodano logi pobierania/zmiany nazwy oraz automatyczne ponowienia.
 - Nazwa kanału ma format `│✅・legit-check→LICZBA`.
+
+## LTC – ujednolicenie prowizji
+- Dodano LTC do menu panelu prowizji (`kalkulator.js`).
+- Dodano sekcję prowizji wychodzących z LTC: BLIK 4%, KOD BLIK 4%, PayPal 4%, Crypto 4%.
+- LTC jest widoczne wysoko na listach formularzy w `tickets.js` i `obliczprowizje.js`.
+- Dodano testy chroniące obsługę LTC przed przypadkowym usunięciem.

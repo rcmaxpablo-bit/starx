@@ -299,8 +299,8 @@ module.exports = (client) => {
     return new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(isClaimed ? "unclaim_ticket" : "claim_ticket")
-        .setLabel(isClaimed ? "Odprzejmij Ticket" : "Przejmij Ticket")
-        .setEmoji(isClaimed ? "🔓" : "🔒")
+        .setLabel(isClaimed ? "Oddaj Ticket" : "Przejmij Ticket")
+        .setEmoji(isClaimed ? { id: "1510596058470809690" } : { id: "1501697222901895258" })
         .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
         .setCustomId("ticket_settings")
@@ -309,17 +309,16 @@ module.exports = (client) => {
         .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
         .setCustomId("close_ticket")
-        .setLabel("Zamknij/Wykonane")
-        .setEmoji("✅")
+        .setLabel("Zamknij / Wykonane")
+        .setEmoji({ id: "1499784378992295956", animated: true })
         .setStyle(ButtonStyle.Danger),
       new ButtonBuilder()
         .setCustomId("send_legit_check")
         .setLabel("Legit Check")
-        .setEmoji("📣")
+        .setEmoji({ id: "1499784353012514917", animated: true })
         .setStyle(ButtonStyle.Success)
     );
   }
-
 
 
   function createPurchaseLegitModal() {
@@ -548,7 +547,7 @@ module.exports = (client) => {
 
   function normalizeExchangeMethod(value) {
     const v = String(value || "").trim().toUpperCase().replace(/\s+/g, "");
-    if (["BLIK", "KODBLIK", "PAYPAL", "LTC", "BTC", "ETH", "SOL", "USDT", "CRYPTO", "PSC", "SKRILL", "VINTED", "ZEN"].includes(v)) return v;
+    if (["BLIK", "KODBLIK", "PAYPAL", "LTC", "BTC", "ETH", "SOL", "USDT", "CRYPTO", "PSC", "SKRILL"].includes(v)) return v;
     if (v === "KOD-BLIK" || v === "KOD_BLIK") return "KODBLIK";
     return null;
   }
@@ -570,7 +569,6 @@ module.exports = (client) => {
     if (v === "KODBLIK") return EMOJI.kodblik;
     if (v === "PAYPAL") return EMOJI.paypal;
     if (v === "LTC") return EMOJI.ltc;
-    if (["BTC", "ETH", "SOL", "USDT"].includes(v)) return EMOJI.crypto;
     if (v === "CRYPTO") return EMOJI.crypto;
     if (v === "PSC") return EMOJI.psc;
     if (v === "SKRILL") return EMOJI.skrill;
@@ -627,17 +625,42 @@ module.exports = (client) => {
 
   function exchangeChoiceRows(selection = {}) {
     const methods = [
-      ["BLIK", EMOJI.blik], ["KODBLIK", EMOJI.kodblik], ["PAYPAL", EMOJI.paypal],
-      ["LTC", EMOJI.ltc], ["BTC", "🪙"], ["ETH", "🔷"], ["SOL", "🟣"],
-      ["USDT", "💵"], ["CRYPTO", EMOJI.crypto], ["PSC", EMOJI.psc], ["SKRILL", EMOJI.skrill]
+      { label: "BLIK", value: "BLIK", emoji: { id: "1499784231608389742" } },
+      { label: "KOD BLIK", value: "KODBLIK", emoji: { id: "1499784231608389742" } },
+      { label: "PAYPAL", value: "PAYPAL", emoji: { id: "1499784258091483236" } },
+      { label: "LTC", value: "LTC", emoji: { id: "1499784285211726014" } },
+      { label: "BTC", value: "BTC" },
+      { label: "ETH", value: "ETH" },
+      { label: "SOL", value: "SOL" },
+      { label: "USDT", value: "USDT" },
+      { label: "CRYPTO", value: "CRYPTO", emoji: { id: "1499784635201224724" } },
+      { label: "PSC", value: "PSC", emoji: { id: "1519440223140970636" } },
+      { label: "SKRILL", value: "SKRILL", emoji: { id: "1519440276492521472" } }
     ];
-    const currencies = [["PLN", "🇵🇱"], ["EUR", "🇪🇺"], ["USD", "🇺🇸"]];
-    const menu = (id, placeholder, values, selected) => new StringSelectMenuBuilder()
-      .setCustomId(id).setPlaceholder(selected || placeholder).addOptions(values.map(([value, emoji]) => {
-        const option = new StringSelectMenuOptionBuilder().setLabel(value).setValue(value).setEmoji(emoji);
-        if (value === selected) option.setDefault(true);
+
+    const currencies = [
+      { label: "PLN", value: "PLN", emoji: "🇵🇱" },
+      { label: "EUR", value: "EUR", emoji: "🇪🇺" },
+      { label: "USD", value: "USD", emoji: "🇺🇸" }
+    ];
+
+    const menu = (id, placeholder, values, selected) => {
+      const select = new StringSelectMenuBuilder()
+        .setCustomId(id)
+        .setPlaceholder(selected || placeholder);
+
+      select.addOptions(values.map(item => {
+        const option = new StringSelectMenuOptionBuilder()
+          .setLabel(item.label)
+          .setValue(item.value);
+        if (item.emoji) option.setEmoji(item.emoji);
+        if (item.value === selected) option.setDefault(true);
         return option;
       }));
+
+      return select;
+    };
+
     return [
       new ActionRowBuilder().addComponents(menu("exchange_from_select", "Z czego?", methods, selection.from)),
       new ActionRowBuilder().addComponents(menu("exchange_to_select", "Na co?", methods, selection.to)),
@@ -1113,22 +1136,21 @@ module.exports = (client) => {
         });
       }
 
-      const exchange = `${rateMethod(from)}->${rateMethod(to)}`;
-      const percent = rates[exchange];
+      const calculated = calculateExchange(amount, from, to, currency);
 
-      if (!percent) {
+      if (!calculated) {
         return interaction.reply({
-          content: `${EMOJI.warning} Nie mozna wymienic tej metody.`,
+          content: `${EMOJI.warning} Nie można wymienić tej metody albo podano niepoprawną kwotę.`,
           ephemeral: true
         });
       }
 
-      const calculated = calculateExchange(amount, from, to, currency);
-      if (!calculated) {
-        return interaction.reply({ content: `${EMOJI.warning} Nie można obliczyć tej wymiany.`, ephemeral: true });
-      }
-      const { amount: numericAmount, fee, afterFee } = calculated;
-      const exchangePayload = { ...calculated, userId: interaction.user.id, createdAt: Date.now() };
+      const { amount: numericAmount, percent, fee, afterFee } = calculated;
+      const exchangePayload = {
+        ...calculated,
+        userId: interaction.user.id,
+        createdAt: Date.now()
+      };
 
       await interaction.deferReply({ ephemeral: true });
 
@@ -1160,7 +1182,35 @@ module.exports = (client) => {
         ]
       });
 
-      const embed = buildExchangeEmbed(exchangePayload, interaction.user);
+      const embed = new EmbedBuilder()
+        .setColor(EMBED_COLOR)
+        .setTitle(`${EMOJI.money} 🌟 StarX Exchange × WYMIANA WALUTY`)
+        .setDescription([
+          `> ${EMOJI.arrow} Użytkownik ${interaction.user} utworzył ticket wymiany.`,
+          `> ${EMOJI.arrow} Realizator odpowie najszybciej jak to możliwe.`,
+          ``,
+          `━━━━━━━━━━━━━━━━━━━━━━━`,
+          ``,
+          `${EMOJI.money} **JAKA KWOTA:**`,
+          `> ${formatCurrency(amount, currency)}`,
+          ``,
+          `${methodEmoji(from)} **Z CZEGO:**`,
+          `> ${displayExchangeMethod(from)}`,
+          ``,
+          `${methodEmoji(to)} **NA CO:**`,
+          `> ${displayExchangeMethod(to)}`,
+          ``,
+          `${currencyEmoji(currency)} **JAKĄ WALUTĘ POSIADASZ:**`,
+          `> ${currency}`,
+          ``,
+          `${EMOJI.zap} **PROWIZJA:**`,
+          `> ${percent}% — ${formatCurrency(fee, currency)} (minimum 3 PLN)`,
+          ``,
+          `${EMOJI.pin} **PO PROWIZJI:**`,
+          `> ${formatCurrency(afterFee, currency)}`
+        ].join("\n"))
+        .setImage(BANNER_TICKET_URL)
+        .setFooter({ text: "© 2026 StarX Exchange" });
 
       exchangeData.set(channel.id, exchangePayload);
 
@@ -1601,16 +1651,26 @@ module.exports = (client) => {
 
   client.on(Events.MessageCreate, async message => {
     try {
-      if (message.author.bot || !message.guild || message.content.trim().toLowerCase() !== "sent") return;
+      if (!message.guild || message.author.bot) return;
+      if (String(message.content || "").trim().toLowerCase() !== "sent") return;
+
       const parts = String(message.channel.topic || "").split(":");
       if (parts[1] !== "exchange") return;
-      const claimedId = claimedTickets.get(message.channel.id);
-      const exchanger = claimedId
-        ? await message.guild.members.fetch(claimedId).then(m => m.user).catch(() => message.author)
-        : message.author;
-      await sendExchangeLegit(message.channel, exchanger, message);
+
+      const exchangerId = claimedTickets.get(message.channel.id);
+      const exchanger = exchangerId
+        ? await message.guild.members.fetch(exchangerId).catch(() => null)
+        : null;
+
+      if (!exchanger) {
+        await message.reply(`${EMOJI.warning} Najpierw realizator musi przejąć ticket.`).catch(() => {});
+        return;
+      }
+
+      await sendExchangeLegit(message.channel, exchanger.user, message);
     } catch (err) {
-      console.error("AUTO SENT LEGIT ERROR:", err?.stack || err);
+      console.error("AUTO LEGIT SENT ERROR:", err?.stack || err);
     }
   });
+
 };

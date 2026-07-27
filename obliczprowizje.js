@@ -95,6 +95,10 @@ module.exports = (client) => {
                 .setValue("KODBLIK")
                 .setEmoji({ id: "1499784231608389742", name: "blik" }),
             new StringSelectMenuOptionBuilder()
+                .setLabel("LTC")
+                .setValue("LTC")
+                .setEmoji({ id: "1499784285211726014", name: "ltc" }),
+            new StringSelectMenuOptionBuilder()
                 .setLabel("PSC")
                 .setValue("PSC")
                 .setEmoji({ id: "1519440223140970636", name: "MYPSC" }),
@@ -109,11 +113,7 @@ module.exports = (client) => {
             new StringSelectMenuOptionBuilder()
                 .setLabel("SKRILL")
                 .setValue("SKRILL")
-                .setEmoji({ id: "1519440276492521472", name: "SKRILL" }),
-            new StringSelectMenuOptionBuilder()
-                .setLabel("LTC")
-                .setValue("LTC")
-                .setEmoji({ id: "1499784285211726014", name: "ltc" })
+                .setEmoji({ id: "1519440276492521472", name: "SKRILL" })
         ];
     }
 

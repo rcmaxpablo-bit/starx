@@ -35,6 +35,12 @@ module.exports = async (client) => {
       `${EMOJI.blik} **KOD BLIK** -> ${EMOJI.ltc} **LTC** - Prowizja wynosi: **11%**`,
       `${EMOJI.blik} **KOD BLIK** -> ${EMOJI.skrill} **SKRILL** - Prowizja wynosi: **6%**`
     ],
+    LTC: [
+      `${EMOJI.ltc} **LTC** -> ${EMOJI.blik} **BLIK** - Prowizja wynosi: **4%**`,
+      `${EMOJI.ltc} **LTC** -> ${EMOJI.blik} **KOD BLIK** - Prowizja wynosi: **4%**`,
+      `${EMOJI.ltc} **LTC** -> ${EMOJI.paypal} **PAYPAL** - Prowizja wynosi: **4%**`,
+      `${EMOJI.ltc} **LTC** -> ${EMOJI.crypto} **CRYPTO** - Prowizja wynosi: **4%**`
+    ],
     PSC: [
       `${EMOJI.psc} **PSC** -> ${EMOJI.blik} **BLIK** - Prowizja wynosi: **11%**`,
       `${EMOJI.psc} **PSC** -> ${EMOJI.blik} **KOD BLIK** - Prowizja wynosi: **11%**`,
@@ -70,6 +76,7 @@ module.exports = async (client) => {
     return [
       { label: "BLIK", value: "BLIK", emoji: { id: "1499784231608389742", name: "blik" } },
       { label: "KOD BLIK", value: "KODBLIK", emoji: { id: "1499784231608389742", name: "blik" } },
+      { label: "LTC", value: "LTC", emoji: { id: "1499784285211726014", name: "ltc" } },
       { label: "PSC", value: "PSC", emoji: { id: "1519440223140970636", name: "MYPSC" } },
       { label: "PAYPAL", value: "PAYPAL", emoji: { id: "1499784258091483236", name: "paypal" } },
       { label: "CRYPTO", value: "CRYPTO", emoji: { id: "1499784635201224724", name: "crypto" } },
