@@ -940,6 +940,7 @@ module.exports = (client) => {
   // Obsługa licznika LC i Panelu Klienta znajduje się w customerLegitSystem.js.
 
   client.on(Events.InteractionCreate, async (interaction) => {
+    try {
 
     // =========================
     // MENU
@@ -990,6 +991,10 @@ module.exports = (client) => {
       // =====================================
       // CREATE CHANNEL
       // =====================================
+      // Utworzenie kanału i wysłanie wiadomości może potrwać dłużej niż trzy
+      // sekundy. Potwierdzamy interakcję przed rozpoczęciem zapytań do API.
+      await interaction.deferReply({ ephemeral: true });
+
       const channel =
         await interaction.guild.channels.create({
 
@@ -1079,10 +1084,9 @@ module.exports = (client) => {
         components: [row]
       });
 
-      return interaction.reply({
+      return interaction.editReply({
         content:
-          `${EMOJI.ticket} Ticket został utworzony: ${channel}`,
-        ephemeral: true
+          `${EMOJI.ticket} Ticket został utworzony: ${channel}`
       });
     }
 
@@ -1122,6 +1126,8 @@ module.exports = (client) => {
           ephemeral: true
         });
       }
+
+      await interaction.deferReply({ ephemeral: true });
 
       const channel = await interaction.guild.channels.create({
         name: unlockTicketName(`middleman-${interaction.user.username}`),
@@ -1181,9 +1187,8 @@ module.exports = (client) => {
         components: [ticketButtons()]
       });
 
-      return interaction.reply({
-        content: `${EMOJI.ticket} Ticket zostal utworzony: ${channel}`,
-        ephemeral: true
+      return interaction.editReply({
+        content: `${EMOJI.ticket} Ticket zostal utworzony: ${channel}`
       });
     }
 
@@ -1235,6 +1240,8 @@ module.exports = (client) => {
       const { amount: numericAmount, fee, afterFee } = calculated;
       const exchangePayload = { ...calculated, userId: interaction.user.id, createdAt: Date.now() };
 
+      await interaction.deferReply({ ephemeral: true });
+
       const channel = await interaction.guild.channels.create({
         name: unlockTicketName(`${from.toLowerCase()}-${to.toLowerCase()}-${interaction.user.username}`),
         parent: CATEGORY_UNCLAIMED_ID,
@@ -1273,9 +1280,8 @@ module.exports = (client) => {
         components: [ticketButtons()]
       });
 
-      return interaction.reply({
-        content: `${EMOJI.ticket} Ticket został utworzony: ${channel}`,
-        ephemeral: true
+      return interaction.editReply({
+        content: `${EMOJI.ticket} Ticket został utworzony: ${channel}`
       });
     }
 
@@ -1702,6 +1708,21 @@ module.exports = (client) => {
 
       return;
     }
+    } catch (err) {
+      console.error("TICKET INTERACTION ERROR:", err?.stack || err);
+      const payload = {
+        content: `${EMOJI.warning} Wystąpił błąd podczas obsługi ticketa. Spróbuj ponownie lub skontaktuj się z administracją.`,
+        ephemeral: true
+      };
+
+      if (interaction.deferred) {
+        await interaction.editReply(payload).catch(() => {});
+      } else if (interaction.replied) {
+        await interaction.followUp(payload).catch(() => {});
+      } else if (interaction.isRepliable()) {
+        await interaction.reply(payload).catch(() => {});
+      }
+    }
   });
 
   client.on(Events.MessageCreate, async message => {
@@ -1719,4 +1740,3 @@ module.exports = (client) => {
     }
   });
 };
-
