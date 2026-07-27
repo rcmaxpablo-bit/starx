@@ -50,6 +50,27 @@ module.exports = (client) => {
   // =========================================
   const EMBED_COLOR = "#1b2dff";
 
+  // Metody dostępne we wszystkich formularzach i listach wyboru.
+  const AVAILABLE_METHODS = Object.freeze([
+    "BLIK",
+    "KODBLIK",
+    "PSC",
+    "PAYPAL",
+    "CRYPTO",
+    "SKRILL"
+  ]);
+
+  // Ustawienia obsługują również istniejące tickety LTC.
+  const SETTINGS_METHODS = Object.freeze([
+    "BLIK",
+    "KODBLIK",
+    "PSC",
+    "PAYPAL",
+    "CRYPTO",
+    "LTC",
+    "SKRILL"
+  ]);
+
   // =========================================
   // TEMP DATA
   // =========================================
@@ -328,35 +349,45 @@ module.exports = (client) => {
 
 
   function createPurchaseLegitModal() {
+    const itemLabel = new LabelBuilder()
+      .setLabel("CO KUPIŁ KLIENT?")
+      .setDescription("Wpisz nazwę produktu lub usługi")
+      .setTextInputComponent(
+        new TextInputBuilder()
+          .setCustomId("purchase_item")
+          .setPlaceholder("Np. YT Premium FA [LIFETIME]")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+      );
+
+    const amountLabel = new LabelBuilder()
+      .setLabel("KWOTA")
+      .setDescription("Podaj kwotę zakupu w PLN")
+      .setTextInputComponent(
+        new TextInputBuilder()
+          .setCustomId("purchase_amount")
+          .setPlaceholder("Np. 24")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+      );
+
+    const methodLabel = new LabelBuilder()
+      .setLabel("METODA PŁATNOŚCI")
+      .setDescription("Wybierz metodę z listy")
+      .setStringSelectMenuComponent(
+        new StringSelectMenuBuilder()
+          .setCustomId("purchase_method")
+          .setPlaceholder("Wybierz metodę płatności")
+          .setMinValues(1)
+          .setMaxValues(1)
+          .setRequired(true)
+          .addOptions(createMethodOptions())
+      );
+
     return new ModalBuilder()
       .setCustomId("purchase_legit_modal")
       .setTitle("Legit check zakupu")
-      .addComponents(
-        new ActionRowBuilder().addComponents(
-          new TextInputBuilder()
-            .setCustomId("purchase_item")
-            .setLabel("Co kupił klient?")
-            .setPlaceholder("Np. YT Premium FA [LIFETIME]")
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true)
-        ),
-        new ActionRowBuilder().addComponents(
-          new TextInputBuilder()
-            .setCustomId("purchase_amount")
-            .setLabel("Kwota")
-            .setPlaceholder("Np. 24")
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true)
-        ),
-        new ActionRowBuilder().addComponents(
-          new TextInputBuilder()
-            .setCustomId("purchase_method")
-            .setLabel("Metoda płatności")
-            .setPlaceholder("Np. PSC / BLIK / PAYPAL / LTC")
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true)
-        )
-      );
+      .addLabelComponents(itemLabel, amountLabel, methodLabel);
   }
 
   function parseUserId(value) {
@@ -496,20 +527,28 @@ module.exports = (client) => {
     if (normalized === "KODBLIK") return EMOJI.kodblik;
     if (normalized === "PAYPAL") return EMOJI.paypal;
     if (normalized === "LTC") return EMOJI.ltc;
-    if (["BTC", "ETH", "SOL", "USDT", "CRYPTO"].includes(normalized)) return EMOJI.crypto;
+    if (normalized === "CRYPTO") return EMOJI.crypto;
     if (normalized === "PSC") return EMOJI.psc;
     if (normalized === "SKRILL") return EMOJI.skrill;
-    if (normalized === "VINTED") return EMOJI.vinted;
-    if (normalized === "ZEN") return EMOJI.zen;
 
     return EMOJI.money;
+  }
+
+  function createMethodOptions(defaultValue = null, methods = AVAILABLE_METHODS) {
+    const selected = normalizeExchangeMethod(defaultValue);
+
+    return methods.map(value => ({
+      label: displayExchangeMethod(value),
+      value,
+      emoji: componentEmoji(selectEmojiForMethod(value)),
+      ...(selected === value ? { default: true } : {})
+    }));
   }
 
   // =========================================
   // PROWIZJE
   // =========================================
   const rates = {
-
     "BLIK->PAYPAL": 2,
     "BLIK->CRYPTO": 8,
     "BLIK->LTC": 8,
@@ -519,6 +558,13 @@ module.exports = (client) => {
     "KODBLIK->CRYPTO": 11,
     "KODBLIK->LTC": 11,
     "KODBLIK->SKRILL": 6,
+
+    "PSC->BLIK": 11,
+    "PSC->KODBLIK": 11,
+    "PSC->PAYPAL": 11,
+    "PSC->CRYPTO": 13,
+    "PSC->LTC": 13,
+    "PSC->SKRILL": 11,
 
     "PAYPAL->BLIK": 9,
     "PAYPAL->CRYPTO": 9,
@@ -535,29 +581,12 @@ module.exports = (client) => {
     "LTC->KODBLIK": 4,
     "LTC->PAYPAL": 4,
     "LTC->CRYPTO": 4,
-    "PSC->BLIK": 11,
-    "PSC->KODBLIK": 11,
-    "PSC->PAYPAL": 11,
-    "PSC->CRYPTO": 13,
-    "PSC->LTC": 13,
-    "PSC->SKRILL": 11,
+
     "SKRILL->BLIK": 9,
     "SKRILL->KODBLIK": 9,
     "SKRILL->PAYPAL": 9,
     "SKRILL->CRYPTO": 9,
-    "SKRILL->LTC": 9,
-    "VINTED->BLIK": 9,
-    "VINTED->PAYPAL": 9,
-    "VINTED->LTC": 9,
-    "VINTED->CRYPTO": 9,
-    "ZEN->BLIK": 4,
-    "ZEN->PAYPAL": 4,
-    "ZEN->LTC": 4,
-    "ZEN->CRYPTO": 4,
-    "BLIK->VINTED": 8,
-    "PAYPAL->VINTED": 9,
-    "LTC->VINTED": 4,
-    "CRYPTO->VINTED": 4,
+    "SKRILL->LTC": 9
   };
 
   // =========================================
@@ -608,10 +637,15 @@ module.exports = (client) => {
 
 
   function normalizeExchangeMethod(value) {
-    const v = String(value || "").trim().toUpperCase().replace(/\s+/g, "");
-    if (["BLIK", "KODBLIK", "PAYPAL", "LTC", "BTC", "ETH", "SOL", "USDT", "CRYPTO", "PSC", "SKRILL", "VINTED", "ZEN"].includes(v)) return v;
-    if (v === "KOD-BLIK" || v === "KOD_BLIK") return "KODBLIK";
-    return null;
+    const v = String(value || "")
+      .trim()
+      .toUpperCase()
+      .replace(/[\s_-]+/g, "");
+
+    if (v === "KODBLIK") return "KODBLIK";
+    if (v === "LTC") return "LTC";
+    if (["BTC", "ETH", "SOL", "USDT"].includes(v)) return "CRYPTO";
+    return AVAILABLE_METHODS.includes(v) ? v : null;
   }
 
   function normalizeCurrency(value) {
@@ -631,7 +665,6 @@ module.exports = (client) => {
     if (v === "KODBLIK") return EMOJI.kodblik;
     if (v === "PAYPAL") return EMOJI.paypal;
     if (v === "LTC") return EMOJI.ltc;
-    if (["BTC", "ETH", "SOL", "USDT"].includes(v)) return EMOJI.crypto;
     if (v === "CRYPTO") return EMOJI.crypto;
     if (v === "PSC") return EMOJI.psc;
     if (v === "SKRILL") return EMOJI.skrill;
@@ -672,28 +705,6 @@ module.exports = (client) => {
   }
 
   function createExchangeModal() {
-    const methods = [
-      "BLIK",
-      "KODBLIK",
-      "PAYPAL",
-      "LTC",
-      "BTC",
-      "ETH",
-      "SOL",
-      "USDT",
-      "CRYPTO",
-      "PSC",
-      "SKRILL",
-      "VINTED",
-      "ZEN"
-    ];
-
-    const methodOptions = methods.map(value => ({
-      label: displayExchangeMethod(value),
-      value,
-      emoji: componentEmoji(selectEmojiForMethod(value))
-    }));
-
     const amountLabel = new LabelBuilder()
       .setLabel("JAKA KWOTA")
       .setDescription("Podaj kwotę wymiany, np. 48")
@@ -717,7 +728,7 @@ module.exports = (client) => {
           .setMinValues(1)
           .setMaxValues(1)
           .setRequired(true)
-          .addOptions(methodOptions)
+          .addOptions(createMethodOptions())
       );
 
     const toLabel = new LabelBuilder()
@@ -730,7 +741,7 @@ module.exports = (client) => {
           .setMinValues(1)
           .setMaxValues(1)
           .setRequired(true)
-          .addOptions(methodOptions)
+          .addOptions(createMethodOptions())
       );
 
     const currencyLabel = new LabelBuilder()
@@ -753,21 +764,15 @@ module.exports = (client) => {
     return new ModalBuilder()
       .setCustomId("exchange_full_modal")
       .setTitle("Formularz wymiany")
-      .addLabelComponents(
-        amountLabel,
-        fromLabel,
-        toLabel,
-        currencyLabel
-      );
+      .addLabelComponents(amountLabel, fromLabel, toLabel, currencyLabel);
   }
 
   function isCryptoMethod(value) {
-    return ["LTC", "BTC", "ETH", "SOL", "USDT", "CRYPTO"].includes(normalizeExchangeMethod(value));
+    return ["CRYPTO", "LTC"].includes(normalizeExchangeMethod(value));
   }
 
   function rateMethod(value) {
-    const normalized = normalizeExchangeMethod(value);
-    return ["BTC", "ETH", "SOL", "USDT"].includes(normalized) ? "CRYPTO" : normalized;
+    return normalizeExchangeMethod(value);
   }
 
   function calculateExchange(amount, from, to, currency = "PLN") {
@@ -813,26 +818,54 @@ module.exports = (client) => {
   function createTicketSettingsModal(channel) {
     const current = exchangeData.get(channel.id) || (() => {
       const parts = String(channel.topic || "").split(":");
-      const calculated = calculateExchange(parts[2], parts[3], parts[4], parts[5]);
-      return calculated;
+      return calculateExchange(parts[2], parts[3], parts[4], parts[5]);
     })();
+
+    const currentFrom = normalizeExchangeMethod(current?.from) || "BLIK";
+    const currentTo = normalizeExchangeMethod(current?.to) || "CRYPTO";
+
+    const amountLabel = new LabelBuilder()
+      .setLabel("KWOTA WYMIANY")
+      .setDescription("Podaj nową kwotę")
+      .setTextInputComponent(
+        new TextInputBuilder()
+          .setCustomId("settings_amount")
+          .setValue(current ? current.amount.toFixed(2) : "")
+          .setPlaceholder("Np. 50")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+      );
+
+    const fromLabel = new LabelBuilder()
+      .setLabel("METODA PŁATNOŚCI — Z CZEGO")
+      .setDescription("Wybierz metodę źródłową")
+      .setStringSelectMenuComponent(
+        new StringSelectMenuBuilder()
+          .setCustomId("settings_from")
+          .setPlaceholder("Wybierz metodę źródłową")
+          .setMinValues(1)
+          .setMaxValues(1)
+          .setRequired(true)
+          .addOptions(createMethodOptions(currentFrom, SETTINGS_METHODS))
+      );
+
+    const toLabel = new LabelBuilder()
+      .setLabel("METODA DOCELOWA — NA CO")
+      .setDescription("Wybierz metodę docelową")
+      .setStringSelectMenuComponent(
+        new StringSelectMenuBuilder()
+          .setCustomId("settings_to")
+          .setPlaceholder("Wybierz metodę docelową")
+          .setMinValues(1)
+          .setMaxValues(1)
+          .setRequired(true)
+          .addOptions(createMethodOptions(currentTo, SETTINGS_METHODS))
+      );
+
     return new ModalBuilder()
       .setCustomId("ticket_settings_modal")
       .setTitle("Ustawienia ticketa")
-      .addComponents(
-        new ActionRowBuilder().addComponents(new TextInputBuilder()
-          .setCustomId("settings_amount").setLabel("Kwota wymiany")
-          .setValue(current ? current.amount.toFixed(2) : "")
-          .setPlaceholder("Np. 50").setStyle(TextInputStyle.Short).setRequired(true)),
-        new ActionRowBuilder().addComponents(new TextInputBuilder()
-          .setCustomId("settings_from").setLabel("Metoda płatności (z czego)")
-          .setValue(current ? displayExchangeMethod(current.from) : "BLIK")
-          .setPlaceholder("BLIK / PAYPAL / LTC").setStyle(TextInputStyle.Short).setRequired(true)),
-        new ActionRowBuilder().addComponents(new TextInputBuilder()
-          .setCustomId("settings_to").setLabel("Waluta/metoda docelowa (na co)")
-          .setValue(current ? displayExchangeMethod(current.to) : "LTC")
-          .setPlaceholder("LTC / BTC / ETH / SOL / USDT").setStyle(TextInputStyle.Short).setRequired(true))
-      );
+      .addLabelComponents(amountLabel, fromLabel, toLabel);
   }
 
   async function syncTicketEmbeds(channel, data) {
@@ -899,6 +932,7 @@ module.exports = (client) => {
           `> ${EMOJI.arrow} Po wystawieniu legit checka ticket zostanie **automatycznie zamknięty**.`
         ].join("\n")).setImage(BANNER_LEGIT_URL).setFooter({ text: "© 2026 StarX Exchange" })]
     });
+    await channel.send({ content: legitText });
     if (deleteMessage) await deleteMessage.delete().catch(() => {});
     return true;
   }
@@ -1245,7 +1279,7 @@ module.exports = (client) => {
 
       if (!from || !to) {
         return interaction.reply({
-          content: `${EMOJI.warning} Podaj poprawne metody płatności, np. BLIK, PAYPAL albo LTC.`,
+          content: `${EMOJI.warning} Wybierz poprawne metody płatności z listy.`,
           ephemeral: true
         });
       }
@@ -1352,8 +1386,12 @@ module.exports = (client) => {
         return interaction.reply({ content: `${EMOJI.warning} Brak uprawnień.`, ephemeral: true });
       }
       const amount = interaction.fields.getTextInputValue("settings_amount").trim().replace(",", ".");
-      const from = normalizeExchangeMethod(interaction.fields.getTextInputValue("settings_from"));
-      const to = normalizeExchangeMethod(interaction.fields.getTextInputValue("settings_to"));
+      const from = normalizeExchangeMethod(
+        interaction.fields.getStringSelectValues("settings_from")[0]
+      );
+      const to = normalizeExchangeMethod(
+        interaction.fields.getStringSelectValues("settings_to")[0]
+      );
       const oldInfo = getExchangeInfoFromTicket(interaction.channel);
       const calculated = calculateExchange(amount, from, to, oldInfo.currency);
       if (!calculated) {
@@ -1516,11 +1554,19 @@ module.exports = (client) => {
 
       const item = interaction.fields.getTextInputValue("purchase_item").trim();
       const amountRaw = interaction.fields.getTextInputValue("purchase_amount").trim().replace(",", ".");
-      const method = interaction.fields.getTextInputValue("purchase_method").trim().toUpperCase();
+      const method = normalizeExchangeMethod(
+        interaction.fields.getStringSelectValues("purchase_method")[0]
+      );
 
       const amountNumber = Number(amountRaw);
-      const amountText = Number.isFinite(amountNumber) ? `${amountNumber.toFixed(0)}PLN` : `${amountRaw}PLN`;
-      const legitText = `+rep ${interaction.user} Purchased ${item} ${amountText} [${method}]`;
+      if (!Number.isFinite(amountNumber) || amountNumber <= 0 || !method) {
+        return interaction.reply({
+          content: `${EMOJI.warning} Podaj poprawną kwotę i wybierz metodę płatności.`,
+          ephemeral: true
+        });
+      }
+      const amountText = `${amountNumber.toFixed(2)} PLN`;
+      const legitText = `+rep <@${interaction.user.id}> Purchased ${item} ${amountText} [${displayExchangeMethod(method)}]`;
 
       saveCustomerTransaction(interaction, {
         clientId,
@@ -1556,6 +1602,10 @@ module.exports = (client) => {
             .setImage(BANNER_LEGIT_URL)
             .setFooter({ text: "© 2026 StarX Exchange" })
         ]
+      });
+
+      await interaction.channel.send({ content: legitText }).catch(error => {
+        console.error("PURCHASE LEGIT RAW MESSAGE ERROR:", error?.message || error);
       });
 
       try {
@@ -1630,6 +1680,10 @@ module.exports = (client) => {
         ]
       });
 
+      await interaction.channel.send({ content: legitText }).catch(error => {
+        console.error("MIDDLEMAN LEGIT RAW MESSAGE ERROR:", error?.message || error);
+      });
+
       try {
         const sendTempPing = async (channelId) => {
           if (!clientId || !channelId) return;
@@ -1674,7 +1728,7 @@ module.exports = (client) => {
       const amount = topicParts?.[2] || "0.00";
       const exchangeInfo = getExchangeInfoFromTicket(interaction.channel);
       const fromTo = `${displayExchangeMethod(exchangeInfo.from)} TO ${displayExchangeMethod(exchangeInfo.to)}`;
-      const legitText = `+rep ${interaction.user} Exchanged ${fromTo} ${formatCurrency(amount, exchangeInfo.currency)}`;
+      const legitText = `+rep <@${interaction.user.id}> Exchanged ${fromTo} ${formatCurrency(amount, exchangeInfo.currency)}`;
 
       saveCustomerTransaction(interaction, {
         clientId,
@@ -1711,6 +1765,10 @@ module.exports = (client) => {
             .setImage(BANNER_LEGIT_URL)
             .setFooter({ text: "© 2026 StarX Exchange" })
         ]
+      });
+
+      await interaction.channel.send({ content: legitText }).catch(error => {
+        console.error("EXCHANGE LEGIT RAW MESSAGE ERROR:", error?.message || error);
       });
 
       try {

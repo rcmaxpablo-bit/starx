@@ -3,6 +3,7 @@ const {
   ActionRowBuilder,
   StringSelectMenuBuilder,
   ModalBuilder,
+  LabelBuilder,
   TextInputBuilder,
   TextInputStyle,
   Events
@@ -28,54 +29,44 @@ module.exports = (client) => {
   const rates = {
     BLIK_PAYPAL: 2,
     BLIK_CRYPTO: 8,
-    BLIK_LTC: 8,
     BLIK_SKRILL: 2,
 
     KODBLIK_PAYPAL: 6,
     KODBLIK_CRYPTO: 11,
-    KODBLIK_LTC: 11,
     KODBLIK_SKRILL: 6,
 
     PSC_BLIK: 11,
     PSC_KODBLIK: 11,
     PSC_PAYPAL: 11,
     PSC_CRYPTO: 13,
-    PSC_LTC: 13,
     PSC_SKRILL: 11,
 
     PAYPAL_BLIK: 9,
     PAYPAL_CRYPTO: 9,
-    PAYPAL_LTC: 9,
     PAYPAL_SKRILL: 9,
 
     CRYPTO_BLIK: 4,
     CRYPTO_KODBLIK: 4,
     CRYPTO_PAYPAL: 4,
     CRYPTO_CRYPTO: 4,
-    CRYPTO_LTC: 4,
     CRYPTO_SKRILL: 4,
 
     SKRILL_BLIK: 9,
     SKRILL_KODBLIK: 9,
     SKRILL_PAYPAL: 9,
-    SKRILL_CRYPTO: 9,
-    SKRILL_LTC: 9,
-
-    LTC_BLIK: 4,
-    LTC_KODBLIK: 4,
-    LTC_PAYPAL: 4,
-    LTC_CRYPTO: 4
+    SKRILL_CRYPTO: 9
   };
 
-  const VALID_METHODS = new Set([
+  const AVAILABLE_METHODS = Object.freeze([
     "BLIK",
     "KODBLIK",
     "PSC",
     "PAYPAL",
     "CRYPTO",
-    "LTC",
     "SKRILL"
   ]);
+
+  const VALID_METHODS = new Set(AVAILABLE_METHODS);
 
   function normalizeMethod(value) {
     const normalized = String(value || "")
@@ -83,7 +74,7 @@ module.exports = (client) => {
       .toUpperCase()
       .replace(/[ _-]+/g, "");
 
-    if (["BTC", "ETH", "SOL", "USDT"].includes(normalized)) {
+    if (["LTC", "BTC", "ETH", "SOL", "USDT"].includes(normalized)) {
       return "CRYPTO";
     }
 
@@ -98,42 +89,78 @@ module.exports = (client) => {
     if (method === "BLIK" || method === "KODBLIK") return EMOJI.blik;
     if (method === "PAYPAL") return EMOJI.paypal;
     if (method === "CRYPTO") return EMOJI.crypto;
-    if (method === "LTC") return EMOJI.ltc;
     if (method === "PSC") return EMOJI.psc;
     if (method === "SKRILL") return EMOJI.skrill;
     return EMOJI.money;
   }
 
+  function componentEmoji(value) {
+    const raw = String(value || "").trim();
+    const match = raw.match(/^<(a?):([A-Za-z0-9_]+):(\d{17,20})>$/);
+
+    if (match) {
+      return {
+        animated: match[1] === "a",
+        name: match[2],
+        id: match[3]
+      };
+    }
+
+    return { name: raw || "💱" };
+  }
+
+  function createMethodOptions() {
+    return AVAILABLE_METHODS.map(method => ({
+      label: methodName(method),
+      value: method,
+      emoji: componentEmoji(methodEmoji(method))
+    }));
+  }
+
   function createCalcModal(type) {
+    const amountLabel = new LabelBuilder()
+      .setLabel("JAKA KWOTA")
+      .setDescription(type === "otrzymam"
+        ? "Podaj kwotę, od której ma zostać odjęta prowizja"
+        : "Podaj kwotę, którą chcesz otrzymać")
+      .setTextInputComponent(
+        new TextInputBuilder()
+          .setCustomId("amount")
+          .setStyle(TextInputStyle.Short)
+          .setPlaceholder("Np. 250")
+          .setRequired(true)
+      );
+
+    const fromLabel = new LabelBuilder()
+      .setLabel("Z CZEGO")
+      .setDescription("Wybierz metodę źródłową")
+      .setStringSelectMenuComponent(
+        new StringSelectMenuBuilder()
+          .setCustomId("from")
+          .setPlaceholder("Wybierz metodę źródłową")
+          .setMinValues(1)
+          .setMaxValues(1)
+          .setRequired(true)
+          .addOptions(createMethodOptions())
+      );
+
+    const toLabel = new LabelBuilder()
+      .setLabel("NA CO")
+      .setDescription("Wybierz metodę docelową")
+      .setStringSelectMenuComponent(
+        new StringSelectMenuBuilder()
+          .setCustomId("to")
+          .setPlaceholder("Wybierz metodę docelową")
+          .setMinValues(1)
+          .setMaxValues(1)
+          .setRequired(true)
+          .addOptions(createMethodOptions())
+      );
+
     return new ModalBuilder()
       .setCustomId(`calc_modal_${type}`)
       .setTitle("Kalkulator prowizji")
-      .addComponents(
-        new ActionRowBuilder().addComponents(
-          new TextInputBuilder()
-            .setCustomId("amount")
-            .setLabel("JAKA KWOTA")
-            .setStyle(TextInputStyle.Short)
-            .setPlaceholder("Np. 250")
-            .setRequired(true)
-        ),
-        new ActionRowBuilder().addComponents(
-          new TextInputBuilder()
-            .setCustomId("from")
-            .setLabel("Z CZEGO")
-            .setStyle(TextInputStyle.Short)
-            .setPlaceholder("BLIK / KOD BLIK / PAYPAL / CRYPTO / LTC")
-            .setRequired(true)
-        ),
-        new ActionRowBuilder().addComponents(
-          new TextInputBuilder()
-            .setCustomId("to")
-            .setLabel("NA CO")
-            .setStyle(TextInputStyle.Short)
-            .setPlaceholder("BLIK / KOD BLIK / PAYPAL / CRYPTO / LTC")
-            .setRequired(true)
-        )
-      );
+      .addLabelComponents(amountLabel, fromLabel, toLabel);
   }
 
   function calculateResult(type, amount, percent) {
@@ -234,8 +261,12 @@ module.exports = (client) => {
           .trim()
           .replace(",", ".")
       );
-      const from = normalizeMethod(interaction.fields.getTextInputValue("from"));
-      const to = normalizeMethod(interaction.fields.getTextInputValue("to"));
+      const from = normalizeMethod(
+        interaction.fields.getStringSelectValues("from")[0]
+      );
+      const to = normalizeMethod(
+        interaction.fields.getStringSelectValues("to")[0]
+      );
 
       if (!Number.isFinite(amount) || amount <= 0) {
         return interaction.reply({
@@ -246,7 +277,7 @@ module.exports = (client) => {
 
       if (!from || !to) {
         return interaction.reply({
-          content: "Podaj poprawne metody, np. BLIK, KOD BLIK, PAYPAL, CRYPTO, LTC, PSC lub SKRILL.",
+          content: "Podaj poprawne metody, np. BLIK, KOD BLIK, PSC, PAYPAL, CRYPTO lub SKRILL.",
           flags: EPHEMERAL
         });
       }

@@ -11,7 +11,7 @@ function createClient() {
   return client;
 }
 
-test("kalkulator prowizji otwiera klasyczny formularz tekstowy", async () => {
+test("kalkulator prowizji otwiera formularz z listami wyboru", async () => {
   const client = createClient();
   require("../obliczprowizje")(client);
 
@@ -34,11 +34,18 @@ test("kalkulator prowizji otwiera klasyczny formularz tekstowy", async () => {
   assert.ok(modal, "Formularz kalkulatora nie został wyświetlony");
   assert.equal(modal.custom_id, "calc_modal_otrzymam");
   assert.equal(modal.components.length, 3);
-  assert.ok(modal.components.every(row => row.type === ComponentType.ActionRow));
-  assert.ok(modal.components.every(row =>
-    row.components.length === 1 &&
-    row.components[0].type === ComponentType.TextInput
-  ));
+  assert.ok(modal.components.every(component => component.type === ComponentType.Label));
+
+  const [amount, from, to] = modal.components;
+  assert.equal(amount.component.type, ComponentType.TextInput);
+  assert.equal(amount.component.custom_id, "amount");
+
+  const expectedMethods = ["BLIK", "KODBLIK", "PSC", "PAYPAL", "CRYPTO", "SKRILL"];
+  for (const [component, customId] of [[from, "from"], [to, "to"]]) {
+    assert.equal(component.component.type, ComponentType.StringSelect);
+    assert.equal(component.component.custom_id, customId);
+    assert.deepEqual(component.component.options.map(option => option.value), expectedMethods);
+  }
 });
 
 test("moduł cennik nie dubluje obsługi komendy autolc", () => {
