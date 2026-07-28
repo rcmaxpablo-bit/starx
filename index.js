@@ -66,7 +66,7 @@ const modules = [
 
   // Panel Klienta musi zarejestrować obsługę interakcji jako pierwszy.
   // Dzięki temu menu oraz /panelklienta są potwierdzane natychmiast.
-  "./customerLegitSystem",
+  "./customerPanel",
   "./tickets",
   "./welcome",
   "./autolc",

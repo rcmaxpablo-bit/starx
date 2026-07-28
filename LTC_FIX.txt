@@ -1,2 +1,0 @@
-Dodano LTC do list wyboru Z CZEGO i NA CO oraz do pozostałych list metod płatności.
-LTC jest umieszczone jako trzecia opcja, aby było widoczne bez przewijania.
