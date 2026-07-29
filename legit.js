@@ -39,8 +39,8 @@ module.exports = (client) => {
       }
 
       const embed = new EmbedBuilder()
-        .setColor('#1b2dff')
-        .setTitle("🌟 StarX Exchange » CZY JESTEŚMY LEGIT")
+        .setColor('#ffd100')
+        .setTitle("🌟 StarX Exchange × CZY JESTEŚMY LEGIT")
         .setDescription(
 `<a:1499784353012514917:1499784353012514917> Jeśli uważasz, że **TAK**, kliknij przycisk poniżej.
 
@@ -50,7 +50,7 @@ module.exports = (client) => {
         )
         .setImage("https://i.imgur.com/QYhsGEm_d.webp?maxwidth=760&fidelity=grand")
         .setFooter({
-          text: "© 2026 StarX Exchange x Legit Check"
+          text: "© 2026 StarX Exchange × Legit Check"
         });
 
       const row = new ActionRowBuilder().addComponents(
@@ -103,8 +103,8 @@ module.exports = (client) => {
     if (interaction.customId === "legit_no") noVotes++;
 
     const embed = new EmbedBuilder()
-      .setColor('#1b2dff')
-      .setTitle("🌟 StarX Exchange » CZY JESTEŚMY LEGIT")
+      .setColor('#ffd100')
+      .setTitle("🌟 StarX Exchange × CZY JESTEŚMY LEGIT")
       .setDescription(
 `<a:1499784353012514917:1499784353012514917> Jeśli uważasz, że **TAK**, kliknij przycisk poniżej.
 
@@ -114,7 +114,7 @@ module.exports = (client) => {
       )
       .setImage("https://i.imgur.com/QYhsGEm_d.webp?maxwidth=760&fidelity=grand")
       .setFooter({
-        text: "© 2026 StarX Exchange x Legit Check"
+        text: "© 2026 StarX Exchange × Legit Check"
       });
 
     const row = new ActionRowBuilder().addComponents(

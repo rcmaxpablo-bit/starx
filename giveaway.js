@@ -181,11 +181,11 @@ module.exports = (client) => {
             new EmbedBuilder()
 
                 .setColor(
-                    "#0f1014"
+                    "#ffd100"
                 )
 
                 .setTitle(
-                    `${EMOJI.nitro} PREMIUM GIVEAWAY`
+                    `${EMOJI.nitro} ︲ StarX Exchange × PREMIUM GIVEAWAY`
                 )
 
                 .setDescription(
@@ -368,10 +368,10 @@ ${EMOJI.arrow} Kliknij przycisk poniżej aby dołączyć.
         const embed =
             new EmbedBuilder()
 
-                .setColor('#1b2dff')
+                .setColor('#ffd100')
 
                 .setTitle(
-                    `${EMOJI.confetti} GIVEAWAY ZAKOŃCZONY`
+                    `${EMOJI.confetti} ︲ StarX Exchange × GIVEAWAY ZAKOŃCZONY`
                 )
 
                 .setDescription(
@@ -691,7 +691,7 @@ ${EMOJI.ticket} **ID**
 
                 const embed =
                     new EmbedBuilder()
-                        .setColor("#1b2dff")
+                        .setColor("#ffd100")
                         .setTitle(`${EMOJI.ticket} UCZESTNICY GIVEAWAY`)
                         .setDescription(
 `${EMOJI.pin} **Nagroda**
@@ -708,7 +708,7 @@ ${chunks[0] || "Brak uczestników"}`
                         )
                         .setFooter({
                             text:
-                                "© 2026 StarX Exchange x Giveaway"
+                                "© 2026 StarX Exchange × Giveaway"
                         });
 
                 await interaction.reply({

@@ -18,8 +18,8 @@ module.exports = (client) => {
 
   function createEmbed() {
     return new EmbedBuilder()
-      .setColor('#1b2dff')
-      .setTitle('🌟 StarX Exchange × LEGIT CHECK')
+      .setColor('#ffd100')
+      .setTitle('🌟 ︲ StarX Exchange × LEGIT CHECK')
       .setDescription([
         `${EMOJI.nitro} Dziękujemy za wybranie **StarX Exchange!**`,
         '',
@@ -37,6 +37,7 @@ module.exports = (client) => {
         '',
         `${EMOJI.pin} Po wystawieniu legit checka ticket zostanie automatycznie zamknięty.`
       ].join('\n'))
+      .setImage('https://i.imgur.com/QYhsGEm_d.webp?maxwidth=760&fidelity=grand')
       .setFooter({ text: `© 2026 StarX Exchange • ${PANEL_MARKER}` });
   }
 

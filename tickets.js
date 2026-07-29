@@ -49,7 +49,7 @@ module.exports = (client) => {
   // =========================================
   // COLOR
   // =========================================
-  const EMBED_COLOR = "#1b2dff";
+  const EMBED_COLOR = "#ffd100";
 
   // =========================================
   // TEMP DATA
@@ -905,15 +905,15 @@ module.exports = (client) => {
         .setColor(EMBED_COLOR)
 
         .setTitle(
-          `${EMOJI.ticket} 🌟 StarX Exchange » WYMIANA`
+          `${EMOJI.ticket} 🌟 ︲ StarX Exchange × WYMIANA`
         )
 
         .setDescription([
 
-          `> ${EMOJI.arrow} Wybierz kategorię z menu poniżej`,
-          `> ${EMOJI.arrow} Szybka i bezpieczna wymiana`,
-          `> ${EMOJI.arrow} Prywatny ticket z realizatorem`,
-          `> ${EMOJI.arrow} Automatyczne obliczenie prowizji`
+          `> ${EMOJI.arrow} **︲ Wybierz kategorię z menu poniżej.**`,
+          `> ${EMOJI.arrow} **︲ Szybka i bezpieczna wymiana.**`,
+          `> ${EMOJI.arrow} **︲ Prywatny ticket z realizatorem.**`,
+          `> ${EMOJI.arrow} **︲ Automatyczne obliczenie prowizji.**`
 
         ].join("\n"))
 
@@ -1168,7 +1168,7 @@ module.exports = (client) => {
 
       const embed = new EmbedBuilder()
         .setColor(EMBED_COLOR)
-        .setTitle(`${EMOJI.middleman} StarX Exchange x MIDDLEMAN`)
+        .setTitle(`${EMOJI.middleman} StarX Exchange × MIDDLEMAN`)
         .setDescription([
           `> ${EMOJI.arrow} Uzytkownik ${interaction.user} utworzyl ticket middleman.`,
           `> ${EMOJI.arrow} Dodana osoba: <@${otherUserId}>`,
@@ -1531,7 +1531,7 @@ module.exports = (client) => {
         embeds: [
           new EmbedBuilder()
             .setColor(EMBED_COLOR)
-            .setTitle("StarX Exchange x WYSTAW LEGIT CHECKA")
+            .setTitle("StarX Exchange × WYSTAW LEGIT CHECKA")
             .setDescription([
               `> ${EMOJI.arrow} Dziekujemy ${clientId ? `<@${clientId}>` : ""} za skorzystanie z middlemana.`,
               "",

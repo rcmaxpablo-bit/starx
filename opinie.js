@@ -96,16 +96,17 @@ module.exports = (client) => {
       if (!channel) return console.log("❌ Nie znaleziono kanału opinii.");
 
       const embed = new EmbedBuilder()
-        .setColor('#1b2dff')
-        .setTitle(`${EMOJI.nitro} StarX Exchange » WYSTAW OPINIĘ`)
+        .setColor('#ffd100')
+        .setTitle(`${EMOJI.nitro} ︲ StarX Exchange × WYSTAW OPINIĘ`)
         .setDescription(
-`${EMOJI.arrow} Wystawiając nam opinię pokazujesz innym, co zadowoliło Cię u nas.
+`> ${EMOJI.arrow} **︲ Wystawiając nam opinię pokazujesz innym, co zadowoliło Cię u nas.**
 
-${EMOJI.arrow} Będziemy mega wdzięczni za wystawienie nam opinii.
+> ${EMOJI.arrow} **︲ Będziemy bardzo wdzięczni za wystawienie opinii.**
 
-${EMOJI.pin} Opinię napiszesz klikając przycisk poniżej.`
+> ${EMOJI.pin} **︲ Opinię napiszesz klikając przycisk poniżej.**`
         )
-        .setFooter({ text: '© 2026 StarX Exchange x Wystaw Opinię' });
+        .setImage('https://i.imgur.com/QYhsGEm_d.webp?maxwidth=760&fidelity=grand')
+        .setFooter({ text: '© 2026 StarX Exchange × Wystaw Opinię' });
 
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
@@ -215,8 +216,8 @@ ${EMOJI.pin} Opinię napiszesz klikając przycisk poniżej.`
         const channel = await client.channels.fetch(OPINIE_CHANNEL_ID);
 
         const embed = new EmbedBuilder()
-          .setColor('#1b2dff')
-          .setTitle(`${EMOJI.nitro} StarX Exchange » NOWA OPINIA`)
+          .setColor('#ffd100')
+          .setTitle(`${EMOJI.nitro} ︲ StarX Exchange × NOWA OPINIA`)
           .setDescription(
 `${EMOJI.middleman} **Twórca opinii:** ${interaction.user}
 
@@ -236,7 +237,7 @@ ${EMOJI.ticket} **Łączna opinia**
 ${stars(laczna)}`
           )
           .setThumbnail(interaction.user.displayAvatarURL({ dynamic: true }))
-          .setFooter({ text: '© 2026 StarX Exchange x Opinie Klientów' });
+          .setFooter({ text: '© 2026 StarX Exchange × Opinie Klientów' });
 
         // Usuń dotychczasowy panel, aby nowa opinia pojawiła się nad świeżym panelem.
         const oldPanels = await findPanelMessages(channel, { customId: "wystaw_opinie" });

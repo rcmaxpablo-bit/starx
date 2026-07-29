@@ -30,9 +30,9 @@ module.exports = (client) => {
       // embed
       const embed = new EmbedBuilder()
 
-        .setColor('#1b2dff')
+        .setColor('#ffd100')
 
-        .setTitle("🌟 StarX Exchange » Propozycja")
+        .setTitle("🌟 ︲ StarX Exchange × PROPOZYCJA")
 
         .setDescription(
 `${EMOJI.green} Autor: <@${message.author.id}>
@@ -51,6 +51,7 @@ ${message.content}
           })
         )
 
+        .setImage('https://i.imgur.com/QYhsGEm_d.webp?maxwidth=760&fidelity=grand')
         .setFooter({
           text: "© 2026 StarX Exchange"
         });

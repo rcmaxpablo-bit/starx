@@ -12,7 +12,7 @@ const CUSTOMER_PANEL_CHANNEL_ID = '1529242794621665371';
 const LEGIT_CHANNEL_ID = '1500893110048133253';
 const CUSTOMER_MENU_ID = 'starx_customer_panel_final';
 const LEGIT_PREFIX = '│✅・legit-check→';
-const BLUE = 0x1b2dff;
+const BLUE = 0xffd100;
 
 const EMOJI = {
   support: '<:WSPARCIE:1500243961124618381>',
@@ -61,16 +61,17 @@ function date(value) {
 function customerPanelPayload() {
   const embed = new EmbedBuilder()
     .setColor(BLUE)
-    .setTitle('🌟 StarX Exchange » PANEL KLIENTA')
+    .setTitle('🌟 ︲ StarX Exchange × PANEL KLIENTA')
     .setDescription([
-      `${EMOJI.support} **Wybierz odpowiednią opcję z menu poniżej.**`,
+      `> ${EMOJI.support} **︲ Wybierz odpowiednią opcję z menu poniżej.**`,
       '',
-      `${EMOJI.money} Statystyki wydatków i transakcji`,
-      `${EMOJI.list} Historia ostatnich zakupów`,
-      `${EMOJI.people} Twoje zaproszenia`,
-      `${EMOJI.admin} Ranking Top 5 klientów`
+      `> ${EMOJI.money} **︲ Statystyki wydatków i transakcji**`,
+      `> ${EMOJI.list} **︲ Historia ostatnich zakupów**`,
+      `> ${EMOJI.people} **︲ Twoje zaproszenia**`,
+      `> ${EMOJI.admin} **︲ Ranking Top 5 klientów**`
     ].join('\n'))
-    .setFooter({ text: '© 2026 StarX Exchange » Panel Klienta' });
+    .setImage('https://i.imgur.com/QYhsGEm_d.webp?maxwidth=760&fidelity=grand')
+    .setFooter({ text: '© 2026 StarX Exchange × Panel Klienta' });
 
   const menu = new StringSelectMenuBuilder()
     .setCustomId(CUSTOMER_MENU_ID)
@@ -88,11 +89,11 @@ function customerPanelPayload() {
 function legitPanelEmbed() {
   return new EmbedBuilder()
     .setColor(BLUE)
-    .setTitle('🌟 StarX Exchange × LEGIT CHECK')
+    .setTitle('🌟 ︲ StarX Exchange × LEGIT CHECK')
     .setDescription([
-      `${EMOJI.nitro} Dziękujemy za wybranie **StarX Exchange!**`,
+      `> ${EMOJI.nitro} **︲ Dziękujemy za wybranie StarX Exchange!**`,
       '',
-      `${EMOJI.list} Twój legit check jest dla nas bardzo ważny i pomaga budować zaufanie.`,
+      `> ${EMOJI.list} **︲ Twój legit check jest dla nas bardzo ważny i pomaga budować zaufanie.**`,
       '',
       `${EMOJI.arrow} **WZÓR LEGIT CHECKA**`,
       '```md',
@@ -104,8 +105,9 @@ function legitPanelEmbed() {
       '+rep @jarek.svx Purchased Konto Stake 40PLN [BLIK]',
       '```',
       '',
-      `${EMOJI.pin} Po wystawieniu legit checka ticket zostanie automatycznie zamknięty.`
+      `> ${EMOJI.pin} **︲ Po wystawieniu legit checka ticket zostanie automatycznie zamknięty.**`
     ].join('\n'))
+    .setImage('https://i.imgur.com/QYhsGEm_d.webp?maxwidth=760&fidelity=grand')
     .setFooter({ text: '© 2026 StarX Exchange • STARX_LC_PANEL_FINAL' });
 }
 
@@ -157,7 +159,7 @@ module.exports = (client) => {
           panelKey: 'customer-panel',
           customId: CUSTOMER_MENU_ID,
           customIdPrefixes: ['starx_customer_panel'],
-          embedTitle: '🌟 StarX Exchange » PANEL KLIENTA',
+          embedTitle: '🌟 ︲ StarX Exchange × PANEL KLIENTA',
           embedTitleIncludes: 'PANEL KLIENTA',
           maxScan: 1500
         }
@@ -268,7 +270,7 @@ module.exports = (client) => {
 
   async function responseFor(interaction) {
     const choice = interaction.values?.[0];
-    const base = title => new EmbedBuilder().setColor(BLUE).setTitle(title).setFooter({ text: '© 2026 StarX Exchange » Panel Klienta' });
+    const base = title => new EmbedBuilder().setColor(BLUE).setTitle(title).setFooter({ text: '© 2026 StarX Exchange × Panel Klienta' });
     if (choice === 'stats') {
       const c = store.getCustomer(interaction.user.id);
       return { embeds: [base(`${EMOJI.money} Moje Statystyki`).setDescription(`${EMOJI.money} **Wydano:** ${money(c.spent)}\n${EMOJI.cart} **Transakcje:** ${c.transactions || 0}\n${EMOJI.clock} **Pierwszy zakup:** ${date(c.firstPurchaseAt)}\n${EMOJI.pin} **Ostatni zakup:** ${date(c.lastPurchaseAt)}`)] };

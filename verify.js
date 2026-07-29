@@ -102,18 +102,19 @@ module.exports = (client) => {
         if (!channel) return;
 
         const embed = new EmbedBuilder()
-            .setColor('#1b2dff')
-            .setTitle(`${EMOJIS.shield}・Weryfikacja`)
+            .setColor('#ffd100')
+            .setTitle(`${EMOJIS.shield} ︲ StarX Exchange × WERYFIKACJA`)
             .setDescription(
                 [
-                    `> ${EMOJIS.pin} Kliknij menu poniżej`,
-                    `> ${EMOJIS.verify} Rozwiąż proste działanie matematyczne`,
-                    `> ${EMOJIS.shield} Odbierz dostęp do serwera`
+                    `> ${EMOJIS.pin} **︲ Kliknij menu poniżej.**`,
+                    `> ${EMOJIS.verify} **︲ Rozwiąż proste działanie matematyczne.**`,
+                    `> ${EMOJIS.shield} **︲ Odbierz dostęp do serwera.**`
                 ].join("\n")
             )
             .setThumbnail(client.user.displayAvatarURL())
+            .setImage('https://i.imgur.com/QYhsGEm_d.webp?maxwidth=760&fidelity=grand')
             .setFooter({
-                text: "System zabezpieczeń serwera"
+                text: "© 2026 StarX Exchange × Weryfikacja"
             })
             .setTimestamp();
 
@@ -231,7 +232,7 @@ module.exports = (client) => {
                 // SUKCES
                 // =================================
                 const successEmbed = new EmbedBuilder()
-                    .setColor('#1b2dff')
+                    .setColor('#ffd100')
                     .setDescription(
                         `${EMOJIS.verify} **Pomyślnie przeszedłeś weryfikację!**`
                     );
@@ -247,7 +248,7 @@ module.exports = (client) => {
                 // BŁĘDNA ODPOWIEDŹ
                 // =================================
                 const errorEmbed = new EmbedBuilder()
-                    .setColor('#1b2dff')
+                    .setColor('#ffd100')
                     .setDescription(
                         "❌ **Błędna odpowiedź! Spróbuj ponownie.**"
                     );

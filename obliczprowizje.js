@@ -171,15 +171,14 @@ module.exports = (client) => {
         if (!channel) return;
 
         const embed = new EmbedBuilder()
-            .setColor("#1b2dff")
-            .setTitle("StarX Exchange x KALKULATOR PROWIZJI")
+            .setColor("#ffd100")
+            .setTitle("StarX Exchange × KALKULATOR PROWIZJI")
             .setDescription([
-                `${EMOJI.arrow} Jezeli chcesz obliczyc prowizje swojej wymiany, wybierz opcje ponizej.`,
+                `> ${EMOJI.arrow} **︲ Jeżeli chcesz obliczyć prowizję swojej wymiany, wybierz opcję poniżej.**`,
                 "",
-                SEPARATOR,
-                "",
-                `${EMOJI.arrow} Minimalna prowizja wynosi: **3 PLN**`
+                `> ${EMOJI.arrow} **︲ Minimalna prowizja wynosi: 3 PLN**`
             ].join("\n"))
+            .setImage('https://i.imgur.com/QYhsGEm_d.webp?maxwidth=760&fidelity=grand')
             .setFooter({ text: "© 2026 StarX Exchange" });
 
         const menu = new StringSelectMenuBuilder()
@@ -252,8 +251,8 @@ module.exports = (client) => {
             : amount + fee;
 
         const embed = new EmbedBuilder()
-            .setColor("#1b2dff")
-            .setTitle("StarX Exchange x WYNIK")
+            .setColor("#ffd100")
+            .setTitle("StarX Exchange × WYNIK")
             .setDescription([
                 `${methodEmoji(from)} **Z:** ${methodName(from)}`,
                 "",
@@ -266,7 +265,7 @@ module.exports = (client) => {
                 "",
                 `${EMOJI.money} **Wynik:** \`${result.toFixed(2)} PLN\``
             ].join("\n"))
-            .setFooter({ text: "© 2026 StarX Exchange x Kalkulator" });
+            .setFooter({ text: "© 2026 StarX Exchange × Kalkulator" });
 
         return interaction.reply({
             embeds: [embed],

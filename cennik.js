@@ -9,7 +9,7 @@ const { upsertPanel } = require('./panelManager');
 
 const CHANNEL_ID = '1499902366843932763';
 const MENU_ID = 'starx_cennik';
-const BLUE = 0x1b2dff;
+const BLUE = 0xffd100;
 
 const EMOJI = {
   spotify: '<:Spotify:1500238701718933627>',
@@ -35,17 +35,13 @@ const EMOJI = {
 function panelPayload() {
   const embed = new EmbedBuilder()
     .setColor(BLUE)
-    .setTitle('🌟 StarX Exchange » CENNIK')
+    .setTitle('🌟 ︲ StarX Exchange × CENNIK')
     .setDescription([
-      `${EMOJI.pin} Wybierz kategorię z menu poniżej.`,
+      `> ${EMOJI.pin} **︲ Wybierz kategorię z menu poniżej.**`,
       '',
-      '━━━━━━━━━━━━━━━━━━━━━━━',
-      '',
-      `${EMOJI.zap} Szybka realizacja`,
-      `${EMOJI.lock} Bezpieczne transakcje`,
-      `${EMOJI.money} Najlepsze ceny`,
-      '',
-      '━━━━━━━━━━━━━━━━━━━━━━━'
+      `> ${EMOJI.zap} **︲ Szybka realizacja**`,
+      `> ${EMOJI.lock} **︲ Bezpieczne transakcje**`,
+      `> ${EMOJI.money} **︲ Najlepsze ceny**`
     ].join('\n'))
     .setImage('https://i.imgur.com/QYhsGEm_d.webp?maxwidth=760&fidelity=grand')
     .setFooter({ text: '© 2026 StarX Exchange' });
@@ -67,14 +63,14 @@ function priceEmbed(category) {
 
   if (category === 'nitro') {
     return embed
-      .setTitle(`${EMOJI.nitro} StarX Exchange » NITRO`)
+      .setTitle(`${EMOJI.nitro} StarX Exchange × NITRO`)
       .setDescription(`${EMOJI.nitro} **Nitro Boost (28 dni • Full Warranty)**\n${EMOJI.money} \`20 zł\``)
       .setFooter({ text: 'StarX Exchange • Najlepsze ceny' });
   }
 
   if (category === 'streaming') {
     return embed
-      .setTitle(`${EMOJI.netflix} StarX Exchange » STREAMING`)
+      .setTitle(`${EMOJI.netflix} StarX Exchange × STREAMING`)
       .setDescription([
         [`${EMOJI.spotify} **Spotify Premium LIFETIME [KEY]**`, `${EMOJI.money} \`30 zł\``],
         [`${EMOJI.spotify} **Spotify Premium FA [LIFETIME]**`, `${EMOJI.money} \`20 zł\``],
@@ -93,7 +89,7 @@ function priceEmbed(category) {
 
   if (category === 'vpn') {
     return embed
-      .setTitle(`${EMOJI.nord} StarX Exchange » VPN`)
+      .setTitle(`${EMOJI.nord} StarX Exchange × VPN`)
       .setDescription([
         `${EMOJI.nord} **NordVPN (Private) [LIFETIME]**\n${EMOJI.money} \`15 zł\``,
         `${EMOJI.mullvad} **Mullvad VPN [LIFETIME]**\n${EMOJI.money} \`40 zł\``,

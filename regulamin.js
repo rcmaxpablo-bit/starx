@@ -12,8 +12,8 @@ module.exports = (client) => {
       if (!channel) return console.log("❌ Nie znaleziono kanału regulamin.");
 
       const embed = new EmbedBuilder()
-        .setColor('#1b2dff')
-        .setTitle("<:regulamin:1501693215328440370> StarX Exchange • Regulamin")
+        .setColor('#ffd100')
+        .setTitle("<:regulamin:1501693215328440370> ︲ StarX Exchange × REGULAMIN")
         .setDescription(`
 ━━━━━━━━━━━━━━━━━━━━━━━  
 <:pinezka:1501697389050986546> **POSTANOWIENIA OGÓLNE**
@@ -90,13 +90,14 @@ module.exports = (client) => {
 ━━━━━━━━━━━━━━━━━━━━━━━  
 <:uwaga:1501693444030992395> **Zachowaj ostrożność — unikaj podejrzanych transakcji.**
         `)
+        .setImage('https://i.imgur.com/QYhsGEm_d.webp?maxwidth=760&fidelity=grand')
         .setFooter({
           text: "© 2026 StarX Exchange"
         })
         .setTimestamp();
 
       await upsertPanel(channel, { embeds: [embed] }, {
-        embedTitle: "<:regulamin:1501693215328440370> StarX Exchange • Regulamin"
+        embedTitle: "<:regulamin:1501693215328440370> ︲ StarX Exchange × REGULAMIN"
       });
 
       console.log("✅ Regulamin zaktualizowany");

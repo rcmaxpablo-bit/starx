@@ -19,8 +19,8 @@ module.exports = (client) => {
   // =========================
   async function sendPanel(channel) {
     const embed = new EmbedBuilder()
-      .setColor('#1b2dff')
-      .setTitle("🌟 StarX Exchange × LEGIT CHECK")
+      .setColor('#ffd100')
+      .setTitle("🌟 ︲ StarX Exchange × LEGIT CHECK")
       .setDescription(
 `<a:nitro:1501684762601848963> Dziękujemy za wybranie **StarX Exchange**!
 
@@ -40,10 +40,11 @@ module.exports = (client) => {
 
 © 2026 StarX Exchange`
       )
+      .setImage('https://i.imgur.com/QYhsGEm_d.webp?maxwidth=760&fidelity=grand')
       .setFooter({ text: "StarX Exchange" });
 
     panelMessage = await upsertPanel(channel, { embeds: [embed] }, {
-      embedTitle: "🌟 StarX Exchange × LEGIT CHECK"
+      embedTitle: "🌟 ︲ StarX Exchange × LEGIT CHECK"
     });
   }
 

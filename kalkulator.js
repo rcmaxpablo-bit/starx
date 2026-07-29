@@ -89,19 +89,15 @@ module.exports = async (client) => {
     if (!channel) return;
 
     const embed = new EmbedBuilder()
-      .setColor("#1b2dff")
-      .setTitle("StarX Exchange >> PROWIZJE")
+      .setColor("#ffd100")
+      .setTitle("StarX Exchange × PROWIZJE")
       .setDescription([
-        `${EMOJI.money} Wybierz metode platnosci z menu ponizej.`,
+        `> ${EMOJI.money} **︲ Wybierz metodę płatności z menu poniżej.**`,
         "",
-        SEPARATOR,
-        "",
-        `${EMOJI.arrow} Minimalna prowizja wynosi: **3 PLN**`,
-        "",
-        SEPARATOR,
-        "",
-        `${EMOJI.box} Szybkie i przejrzyste prowizje.`
+        `> ${EMOJI.arrow} **︲ Minimalna prowizja wynosi: 3 PLN**`,
+        `> ${EMOJI.box} **︲ Szybkie i przejrzyste prowizje.**`
       ].join("\n"))
+      .setImage('https://i.imgur.com/QYhsGEm_d.webp?maxwidth=760&fidelity=grand')
       .setFooter({ text: "© 2026 StarX Exchange" });
 
     const menu = new StringSelectMenuBuilder()
@@ -137,8 +133,8 @@ module.exports = async (client) => {
     ].join("\n");
 
     const embed = new EmbedBuilder()
-      .setColor("#1b2dff")
-      .setTitle(`StarX Exchange >> ${type}`)
+      .setColor("#ffd100")
+      .setTitle(`StarX Exchange × ${type}`)
       .setDescription(description)
       .setFooter({ text: "© 2026 StarX Exchange" });
 

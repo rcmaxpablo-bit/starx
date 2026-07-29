@@ -210,8 +210,8 @@ module.exports = (client) => {
 
                     const embed =
                         new EmbedBuilder()
-                            .setColor("#1b2dff")
-                            .setTitle(`${EMOJI.money} StarX Exchange » Legit Check`)
+                            .setColor("#ffd100")
+                            .setTitle(`${EMOJI.money} StarX Exchange × Legit Check`)
                             .setDescription(
 `${EMOJI.pin} **Legit utworzony**
 
@@ -248,8 +248,8 @@ ${EMOJI.arrow} **Wklej na <#${REP_CHANNEL_ID}>**`
 
                 const embed =
                     new EmbedBuilder()
-                        .setColor("#1b2dff")
-                        .setTitle(`${EMOJI.money} StarX Exchange » Legit Check`)
+                        .setColor("#ffd100")
+                        .setTitle(`${EMOJI.money} StarX Exchange × Legit Check`)
                         .setDescription(
 `${EMOJI.pin} **Legit utworzony**
 
@@ -285,8 +285,8 @@ ${EMOJI.arrow} **Wklej na <#${REP_CHANNEL_ID}>**`
 
                 const embed =
                     new EmbedBuilder()
-                        .setColor("#1b2dff")
-                        .setTitle(`${EMOJI.money} StarX Exchange » Legit Check`)
+                        .setColor("#ffd100")
+                        .setTitle(`${EMOJI.money} StarX Exchange × Legit Check`)
                         .setDescription(
 `${EMOJI.pin} **Legit utworzony**
 

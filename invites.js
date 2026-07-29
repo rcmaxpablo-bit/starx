@@ -232,8 +232,8 @@ module.exports = (client) => {
             .catch(() => null);
 
         const embed = new EmbedBuilder()
-          .setColor("#1b2dff")
-          .setTitle("🌟 StarX Exchange » NOWE ZAPROSZENIE")
+          .setColor("#ffd100")
+          .setTitle("🌟 StarX Exchange × NOWE ZAPROSZENIE")
           .setDescription(
 `👤 **Nowy użytkownik:** ${member}
 
@@ -303,8 +303,8 @@ module.exports = (client) => {
         return interaction.reply({
           embeds: [
             new EmbedBuilder()
-              .setColor("#1b2dff")
-              .setTitle("🌟 StarX Exchange » TWÓJ LINK")
+              .setColor("#ffd100")
+              .setTitle("🌟 StarX Exchange × TWÓJ LINK")
               .setDescription(
 `👤 ${interaction.user}
 
@@ -327,8 +327,8 @@ https://discord.gg/${invite.code}`
         return interaction.reply({
           embeds: [
             new EmbedBuilder()
-              .setColor("#1b2dff")
-              .setTitle("🌟 StarX Exchange » INVITES")
+              .setColor("#ffd100")
+              .setTitle("🌟 StarX Exchange × INVITES")
               .setDescription(
 `👤 ${interaction.user}
 
@@ -354,8 +354,8 @@ Zaprosiłeś **${amount}** osób.
         return interaction.reply({
           embeds: [
             new EmbedBuilder()
-              .setColor("#1b2dff")
-              .setTitle("🌟 StarX Exchange » CHECK INVITES")
+              .setColor("#ffd100")
+              .setTitle("🌟 StarX Exchange × CHECK INVITES")
               .setDescription(
 `👤 ${user}
 
@@ -399,8 +399,8 @@ Posiada **${amount}** zaproszeń.`
         return interaction.reply({
           embeds: [
             new EmbedBuilder()
-              .setColor("#1b2dff")
-              .setTitle("🌟 StarX Exchange » TOP INVITES")
+              .setColor("#ffd100")
+              .setTitle("🌟 StarX Exchange × TOP INVITES")
               .setDescription(desc)
           ]
         });
@@ -441,8 +441,8 @@ Posiada **${amount}** zaproszeń.`
         return interaction.reply({
           embeds: [
             new EmbedBuilder()
-              .setColor("#1b2dff")
-              .setTitle("🌟 StarX Exchange » TEST INVITE")
+              .setColor("#ffd100")
+              .setTitle("🌟 StarX Exchange × TEST INVITE")
               .setDescription(
 `Dodano **${amount}** zaproszeń użytkownikowi ${user}
 
